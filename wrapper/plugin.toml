@@ -1,21 +1,26 @@
-[plugin]
+schema = "animus.plugin.v1"
 name = "animus-web-ui"
 version = "0.1.2"
 plugin_kind = "transport_backend"
 description = "Serves the bundled Animus React web UI over HTTP"
-homepage = "https://github.com/launchapp-dev/animus-cli"
-repository = "https://github.com/launchapp-dev/animus-web-ui"
-license = "Elastic-2.0"
+
+[capabilities]
+streaming = false
+progress = false
+cancellation = false
+methods = [
+  "transport/start",
+  "transport/shutdown",
+  "transport/schema",
+  "health/check",
+  "$ui/web",
+]
 
 [transport]
+kinds = ["http", "static"]
 default_port = 8082
 supports_streaming = false
 supports_websocket = false
-kinds = ["http", "static"]
 
-[runtime]
-binary = "animus-web-ui"
-protocol = "stdio"
-
-[capabilities]
-required = []
+[binary]
+default = "animus-web-ui"
