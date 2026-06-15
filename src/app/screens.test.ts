@@ -14,7 +14,7 @@ const featureModules = [
   {
     name: "workflow-pages",
     load: () => import("./workflow-pages"),
-    exports: ["WorkflowsPage", "WorkflowDetailPage", "WorkflowCheckpointPage"],
+    exports: ["WorkflowsPage", "WorkflowDetailPage"],
   },
   {
     name: "queue-page",
@@ -27,19 +27,9 @@ const featureModules = [
     exports: ["DaemonPage"],
   },
   {
-    name: "projects-pages",
-    load: () => import("./projects-pages"),
-    exports: ["ProjectsPage", "ProjectDetailPage", "RequirementDetailPage"],
-  },
-  {
     name: "events-page",
     load: () => import("./events-page"),
     exports: ["EventsPage"],
-  },
-  {
-    name: "review-page",
-    load: () => import("./review-page"),
-    exports: ["ReviewHandoffPage"],
   },
   {
     name: "output-page",

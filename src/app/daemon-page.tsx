@@ -1,9 +1,7 @@
-import { Link } from "react-router-dom";
-import { useQuery, useMutation } from "@/lib/graphql/client";
-import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -12,37 +10,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DaemonDocument,
-  DaemonStartDocument,
-  DaemonStopDocument,
-  DaemonPauseDocument,
-  DaemonResumeDocument,
-  DaemonClearLogsDocument,
-} from "@/lib/graphql/generated/graphql";
-import { statusColor, StatusDot, PageLoading, PageError, SectionHeading } from "./shared";
+import { useQuery, useMutation } from "@/lib/graphql/client";
+import { DaemonDocument, StartDaemonDocument } from "@/lib/graphql/generated/graphql";
+import type { DaemonQuery } from "@/lib/graphql/generated/graphql";
+import { StatusDot, PageLoading, PageError, SectionHeading } from "./shared";
 
+// TODO(E-followup): richer rendering — the kernel no longer exposes daemon
+// logs or pause/stop/resume over the control socket; only startDaemon remains.
 export function DaemonPage() {
-  const [result, reexecute] = useQuery({ query: DaemonDocument });
-  const [, startMut] = useMutation(DaemonStartDocument);
-  const [, stopMut] = useMutation(DaemonStopDocument);
-  const [, pauseMut] = useMutation(DaemonPauseDocument);
-  const [, resumeMut] = useMutation(DaemonResumeDocument);
-  const [, clearLogsMut] = useMutation(DaemonClearLogsDocument);
+  const [result, reexecute] = useQuery<DaemonQuery>({ query: DaemonDocument });
+  const [, startMut] = useMutation(StartDaemonDocument);
   const { data, fetching, error } = result;
   if (fetching) return <PageLoading />;
   if (error) return <PageError message={error.message} />;
 
-  const status = data?.daemonStatus;
+  const status = data?.daemon;
   const health = data?.daemonHealth;
-  const agents = data?.agentRuns ?? [];
-  const logs = data?.daemonLogs ?? [];
+  const agents = data?.daemonAgents ?? [];
+  const plugins = health?.plugins ?? [];
 
-  const runAction = async (label: string, fn: () => Promise<any>) => {
-    const { error: err } = await fn();
+  const runStart = async () => {
+    const { error: err } = await startMut({});
     if (err) toast.error(err.message);
     else {
-      toast.success(`${label} successful.`);
+      toast.success("Daemon start requested.");
       reexecute({ requestPolicy: "network-only" });
     }
   };
@@ -52,13 +43,10 @@ export function DaemonPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Daemon</h1>
-          <StatusDot status={status?.healthy ? "healthy" : "error"} />
+          <StatusDot status={health?.healthy ? "healthy" : "error"} />
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => runAction("Start", () => startMut({}))}>Start</Button>
-          <Button size="sm" variant="secondary" onClick={() => runAction("Resume", () => resumeMut({}))}>Resume</Button>
-          <Button size="sm" variant="outline" onClick={() => runAction("Pause", () => pauseMut({}))}>Pause</Button>
-          <Button size="sm" variant="destructive" onClick={() => runAction("Stop", () => stopMut({}))}>Stop</Button>
+          <Button size="sm" onClick={runStart}>Start</Button>
         </div>
       </div>
 
@@ -68,15 +56,63 @@ export function DaemonPage() {
         </CardHeader>
         <CardContent className="px-4 pb-3 space-y-2">
           <div className="flex items-center gap-2">
-            <Badge variant={status?.healthy ? "default" : "destructive"}>{status?.statusRaw ?? "unknown"}</Badge>
-            {status?.runnerConnected && <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-primary/20 text-primary/70">runner</Badge>}
+            <Badge variant={status?.running ? "default" : "destructive"}>
+              {status?.running ? "running" : "stopped"}
+            </Badge>
+            {health?.status && (
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-primary/20 text-primary/70">
+                {health.status}
+              </Badge>
+            )}
+            {status?.version && (
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">v{status.version}</Badge>
+            )}
           </div>
           <div className="flex gap-4 text-xs text-muted-foreground">
-            <span>Agents: <span className="font-mono text-foreground/70">{status?.activeAgents ?? 0}{status?.maxAgents ? ` / ${status.maxAgents}` : ""}</span></span>
+            <span>Agents: <span className="font-mono text-foreground/70">{agents.length}</span></span>
+            {status?.uptimeSeconds != null && (
+              <span>Uptime: <span className="font-mono text-foreground/70">{status.uptimeSeconds}s</span></span>
+            )}
             {status?.projectRoot && <span className="truncate">Root: <span className="font-mono text-foreground/70">{status.projectRoot}</span></span>}
           </div>
+          {health?.lastError && (
+            <p className="text-xs text-destructive font-mono">{health.lastError}</p>
+          )}
         </CardContent>
       </Card>
+
+      {plugins.length > 0 && (
+        <div className="space-y-2">
+          <SectionHeading>Plugins</SectionHeading>
+          <Card className="border-border/40 bg-card/60 overflow-hidden">
+            <CardContent className="px-0 pb-0 pt-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/30 hover:bg-transparent">
+                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Name</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Kind</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {plugins.map((p) => (
+                    <TableRow key={p.name} className="border-border/20 hover:bg-accent/30">
+                      <TableCell className="font-mono text-[11px] py-2">{p.name}</TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground py-2">{p.kind}</TableCell>
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-1.5">
+                          <StatusDot status={p.status} />
+                          <span className="text-[11px]">{p.status}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {agents.length > 0 && (
         <div className="space-y-2">
@@ -89,57 +125,21 @@ export function DaemonPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/30 hover:bg-transparent">
-                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Run</TableHead>
-                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Task</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Session</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Provider</TableHead>
                     <TableHead className="text-[10px] uppercase tracking-wider h-7">Phase</TableHead>
-                    <TableHead className="text-[10px] uppercase tracking-wider h-7">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {agents.map((a) => (
-                    <TableRow key={a.runId} className="border-border/20 hover:bg-accent/30">
-                      <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.runId}</TableCell>
-                      <TableCell className="py-2">
-                        {a.taskId ? (
-                          <Link to={`/tasks/${a.taskId}`} className="text-primary/80 hover:text-primary text-xs transition-colors">
-                            {a.taskTitle ?? a.taskId}
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground/40">-</span>
-                        )}
-                      </TableCell>
+                    <TableRow key={a.sessionId} className="border-border/20 hover:bg-accent/30">
+                      <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.sessionId}</TableCell>
+                      <TableCell className="text-[11px] py-2">{a.provider} / {a.model}</TableCell>
                       <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.phaseId ?? "-"}</TableCell>
-                      <TableCell className="py-2">
-                        <div className="flex items-center gap-1.5">
-                          <StatusDot status={a.status} />
-                          <span className="text-[11px]">{a.status}</span>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {logs.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <SectionHeading>Logs</SectionHeading>
-            <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground" onClick={() => runAction("Clear Logs", () => clearLogsMut({}))}>Clear</Button>
-          </div>
-          <Card className="border-border/40 bg-card/60">
-            <CardContent className="pt-3 pb-3 px-4">
-              <div className="max-h-80 overflow-y-auto font-mono text-xs space-y-0.5">
-                {logs.map((log, i) => (
-                  <div key={i} className="flex gap-2">
-                    <span className="text-muted-foreground/50 shrink-0 text-[10px]">{log.timestamp ?? ""}</span>
-                    <span className={log.level === "ERROR" ? "text-destructive" : "text-foreground/70"}>{log.message ?? ""}</span>
-                  </div>
-                ))}
-              </div>
             </CardContent>
           </Card>
         </div>

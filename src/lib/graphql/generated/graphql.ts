@@ -16,589 +16,156 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
-export type GqlAgentProfile = {
-  __typename?: 'GqlAgentProfile';
-  description: Scalars['String']['output'];
-  mcpServers: Array<Scalars['String']['output']>;
-  model?: Maybe<Scalars['String']['output']>;
-  name: Scalars['String']['output'];
-  role?: Maybe<Scalars['String']['output']>;
-  skills: Array<Scalars['String']['output']>;
-  tool?: Maybe<Scalars['String']['output']>;
+export type CreateSubjectInput = {
+  assignee?: InputMaybe<Scalars['String']['input']>;
+  body?: InputMaybe<Scalars['String']['input']>;
+  kind: Scalars['String']['input'];
+  labels?: Array<Scalars['String']['input']>;
+  /** Priority on a 0..=4 scale. */
+  priority?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<SubjectStatus>;
+  title: Scalars['String']['input'];
 };
 
-export type GqlAgentRun = {
-  __typename?: 'GqlAgentRun';
+/**
+ * An active agent session. Mirrors
+ * [`animus_control_protocol::types::AgentInfo`].
+ */
+export type DaemonAgent = {
+  __typename?: 'DaemonAgent';
+  model: Scalars['String']['output'];
   phaseId?: Maybe<Scalars['String']['output']>;
-  runId: Scalars['String']['output'];
-  status: Scalars['String']['output'];
-  taskId?: Maybe<Scalars['String']['output']>;
-  taskTitle?: Maybe<Scalars['String']['output']>;
+  provider: Scalars['String']['output'];
+  sessionId: Scalars['String']['output'];
+  startedAt: Scalars['String']['output'];
   workflowId?: Maybe<Scalars['String']['output']>;
 };
 
-export type GqlChecklist = {
-  __typename?: 'GqlChecklist';
-  completed: Scalars['Boolean']['output'];
-  description: Scalars['String']['output'];
-  id: Scalars['String']['output'];
-};
-
-export enum GqlComplexity {
-  High = 'HIGH',
-  Low = 'LOW',
-  Medium = 'MEDIUM'
-}
-
-export type GqlDaemonEvent = {
-  __typename?: 'GqlDaemonEvent';
-  data: Scalars['String']['output'];
-  eventType: Scalars['String']['output'];
-  id: Scalars['String']['output'];
-  seq: Scalars['Int']['output'];
-  timestamp: Scalars['String']['output'];
-};
-
-export type GqlDaemonHealth = {
-  __typename?: 'GqlDaemonHealth';
-  activeAgents: Scalars['Int']['output'];
-  daemonPid?: Maybe<Scalars['Int']['output']>;
+/**
+ * Daemon health report. Mirrors
+ * [`animus_control_protocol::types::DaemonHealthResponse`].
+ */
+export type DaemonHealth = {
+  __typename?: 'DaemonHealth';
+  /** Convenience flag: `true` only when `status == HEALTHY`. */
   healthy: Scalars['Boolean']['output'];
-  runnerConnected: Scalars['Boolean']['output'];
-  runnerPid?: Maybe<Scalars['Int']['output']>;
-  status: Scalars['String']['output'];
+  lastError?: Maybe<Scalars['String']['output']>;
+  plugins: Array<PluginHealth>;
+  status: HealthStatus;
 };
 
-export type GqlDaemonLog = {
-  __typename?: 'GqlDaemonLog';
-  fields?: Maybe<Scalars['String']['output']>;
-  level?: Maybe<Scalars['String']['output']>;
-  message?: Maybe<Scalars['String']['output']>;
-  timestamp?: Maybe<Scalars['String']['output']>;
-};
-
-export type GqlDaemonStatus = {
-  __typename?: 'GqlDaemonStatus';
-  activeAgents: Scalars['Int']['output'];
-  healthy: Scalars['Boolean']['output'];
-  maxAgents?: Maybe<Scalars['Int']['output']>;
+/**
+ * Daemon process status. Mirrors
+ * [`animus_control_protocol::types::DaemonStatusResponse`].
+ */
+export type DaemonStatus = {
+  __typename?: 'DaemonStatus';
+  logPath?: Maybe<Scalars['String']['output']>;
+  pid?: Maybe<Scalars['Int']['output']>;
   projectRoot?: Maybe<Scalars['String']['output']>;
-  runnerConnected: Scalars['Boolean']['output'];
-  status: GqlDaemonStatusValue;
-  statusRaw?: Maybe<Scalars['String']['output']>;
-};
-
-export enum GqlDaemonStatusValue {
-  Crashed = 'CRASHED',
-  Paused = 'PAUSED',
-  Running = 'RUNNING',
-  Starting = 'STARTING',
-  Stopped = 'STOPPED',
-  Stopping = 'STOPPING'
-}
-
-export type GqlDecision = {
-  __typename?: 'GqlDecision';
-  confidence: Scalars['Float']['output'];
-  decision: Scalars['String']['output'];
-  phaseId: Scalars['String']['output'];
-  reason: Scalars['String']['output'];
-  risk: Scalars['String']['output'];
-  source: Scalars['String']['output'];
-  targetPhase?: Maybe<Scalars['String']['output']>;
-  timestamp: Scalars['String']['output'];
-};
-
-export type GqlDependency = {
-  __typename?: 'GqlDependency';
-  taskId: Scalars['String']['output'];
-  type: Scalars['String']['output'];
-};
-
-export type GqlKeyValue = {
-  __typename?: 'GqlKeyValue';
-  key: Scalars['String']['output'];
-  value: Scalars['String']['output'];
-};
-
-export type GqlMcpServer = {
-  __typename?: 'GqlMcpServer';
-  args: Array<Scalars['String']['output']>;
-  command: Scalars['String']['output'];
-  env: Array<GqlKeyValue>;
-  name: Scalars['String']['output'];
-  tools: Array<Scalars['String']['output']>;
-  transport?: Maybe<Scalars['String']['output']>;
-};
-
-export type GqlPhaseCatalogEntry = {
-  __typename?: 'GqlPhaseCatalogEntry';
-  category: Scalars['String']['output'];
-  description: Scalars['String']['output'];
-  id: Scalars['String']['output'];
-  label: Scalars['String']['output'];
-  tags: Array<Scalars['String']['output']>;
-};
-
-export type GqlPhaseExecution = {
-  __typename?: 'GqlPhaseExecution';
-  attempt: Scalars['Int']['output'];
-  completedAt?: Maybe<Scalars['String']['output']>;
-  errorMessage?: Maybe<Scalars['String']['output']>;
-  phaseId: Scalars['String']['output'];
-  startedAt?: Maybe<Scalars['String']['output']>;
-  status: Scalars['String']['output'];
-};
-
-export type GqlPhaseOutput = {
-  __typename?: 'GqlPhaseOutput';
-  hasMore: Scalars['Boolean']['output'];
-  lines: Array<Scalars['String']['output']>;
-  phaseId: Scalars['String']['output'];
-};
-
-export enum GqlPriority {
-  Critical = 'CRITICAL',
-  High = 'HIGH',
-  Low = 'LOW',
-  Medium = 'MEDIUM'
-}
-
-export type GqlProject = {
-  __typename?: 'GqlProject';
-  archived: Scalars['Boolean']['output'];
-  description?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
-  metadata?: Maybe<Scalars['String']['output']>;
-  name?: Maybe<Scalars['String']['output']>;
-  path?: Maybe<Scalars['String']['output']>;
-  requirements: Array<GqlRequirement>;
-  tasks: Array<GqlTask>;
-  techStack: Array<Scalars['String']['output']>;
-  type?: Maybe<Scalars['String']['output']>;
-  workflows: Array<GqlWorkflow>;
-};
-
-export type GqlQueueEntry = {
-  __typename?: 'GqlQueueEntry';
-  position?: Maybe<Scalars['Int']['output']>;
-  priority?: Maybe<GqlPriority>;
-  status?: Maybe<GqlTaskStatus>;
-  taskId: Scalars['String']['output'];
-  title?: Maybe<Scalars['String']['output']>;
-  waitTime?: Maybe<Scalars['Float']['output']>;
-};
-
-export type GqlQueueStats = {
-  __typename?: 'GqlQueueStats';
-  avgWait?: Maybe<Scalars['Float']['output']>;
-  depth: Scalars['Int']['output'];
-  heldCount: Scalars['Int']['output'];
-  readyCount: Scalars['Int']['output'];
-  throughput?: Maybe<Scalars['Float']['output']>;
-};
-
-export type GqlRequirement = {
-  __typename?: 'GqlRequirement';
-  acceptanceCriteria: Array<Scalars['String']['output']>;
-  description: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  linkedTaskIds: Array<Scalars['String']['output']>;
-  priority: GqlRequirementPriority;
-  priorityRaw: Scalars['String']['output'];
-  requirementType?: Maybe<GqlRequirementType>;
-  status: GqlRequirementStatus;
-  statusRaw: Scalars['String']['output'];
-  tags: Array<Scalars['String']['output']>;
-  title: Scalars['String']['output'];
-};
-
-export type GqlRequirementConnection = {
-  __typename?: 'GqlRequirementConnection';
-  hasMore: Scalars['Boolean']['output'];
-  items: Array<GqlRequirement>;
-  limit: Scalars['Int']['output'];
-  nextOffset?: Maybe<Scalars['Int']['output']>;
-  offset: Scalars['Int']['output'];
-  returned: Scalars['Int']['output'];
-  totalCount: Scalars['Int']['output'];
-};
-
-export enum GqlRequirementPriority {
-  Could = 'COULD',
-  Must = 'MUST',
-  Should = 'SHOULD',
-  Wont = 'WONT'
-}
-
-export enum GqlRequirementStatus {
-  Approved = 'APPROVED',
-  Deprecated = 'DEPRECATED',
-  Done = 'DONE',
-  Draft = 'DRAFT',
-  EmReview = 'EM_REVIEW',
-  Implemented = 'IMPLEMENTED',
-  InProgress = 'IN_PROGRESS',
-  NeedsRework = 'NEEDS_REWORK',
-  Planned = 'PLANNED',
-  PoReview = 'PO_REVIEW',
-  Refined = 'REFINED'
-}
-
-export enum GqlRequirementType {
-  Functional = 'FUNCTIONAL',
-  NonFunctional = 'NON_FUNCTIONAL',
-  Other = 'OTHER',
-  Product = 'PRODUCT',
-  Technical = 'TECHNICAL'
-}
-
-export enum GqlRiskLevel {
-  High = 'HIGH',
-  Low = 'LOW',
-  Medium = 'MEDIUM'
-}
-
-export enum GqlScope {
-  Large = 'LARGE',
-  Medium = 'MEDIUM',
-  Small = 'SMALL'
-}
-
-export type GqlSkill = {
-  __typename?: 'GqlSkill';
-  category: Scalars['String']['output'];
-  description: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  skillType: Scalars['String']['output'];
-  source: Scalars['String']['output'];
-};
-
-export type GqlSkillDetail = {
-  __typename?: 'GqlSkillDetail';
-  category: Scalars['String']['output'];
-  definitionJson: Scalars['String']['output'];
-  description: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  skillType: Scalars['String']['output'];
-  source: Scalars['String']['output'];
-};
-
-export type GqlSystemInfo = {
-  __typename?: 'GqlSystemInfo';
-  arch?: Maybe<Scalars['String']['output']>;
-  daemonStatus?: Maybe<Scalars['String']['output']>;
-  platform?: Maybe<Scalars['String']['output']>;
-  projectRoot?: Maybe<Scalars['String']['output']>;
+  running: Scalars['Boolean']['output'];
+  uptimeSeconds?: Maybe<Scalars['Int']['output']>;
   version?: Maybe<Scalars['String']['output']>;
 };
 
-export type GqlTask = {
-  __typename?: 'GqlTask';
-  checklist: Array<GqlChecklist>;
-  complexity: GqlComplexity;
-  deadline?: Maybe<Scalars['String']['output']>;
-  dependencies: Array<GqlDependency>;
-  description: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  linkedRequirementIds: Array<Scalars['String']['output']>;
-  priority: GqlPriority;
-  priorityRaw: Scalars['String']['output'];
-  requirements: Array<GqlRequirement>;
-  risk: GqlRiskLevel;
-  scope: GqlScope;
-  status: GqlTaskStatus;
-  statusRaw: Scalars['String']['output'];
-  tags: Array<Scalars['String']['output']>;
-  taskType: GqlTaskType;
-  taskTypeRaw: Scalars['String']['output'];
-  title: Scalars['String']['output'];
+export type EnqueueInput = {
+  /** Priority on a 0..=4 scale. Defaults to 2 (medium) when omitted. */
+  priority?: InputMaybe<Scalars['Int']['input']>;
+  taskId: Scalars['ID']['input'];
 };
 
-export type GqlTaskConnection = {
-  __typename?: 'GqlTaskConnection';
-  hasMore: Scalars['Boolean']['output'];
-  items: Array<GqlTask>;
-  limit: Scalars['Int']['output'];
-  nextOffset?: Maybe<Scalars['Int']['output']>;
-  offset: Scalars['Int']['output'];
-  returned: Scalars['Int']['output'];
-  totalCount: Scalars['Int']['output'];
-};
-
-export type GqlTaskStats = {
-  __typename?: 'GqlTaskStats';
-  byPriority?: Maybe<Scalars['String']['output']>;
-  byStatus?: Maybe<Scalars['String']['output']>;
-  byType?: Maybe<Scalars['String']['output']>;
-  raw: Scalars['String']['output'];
-  total: Scalars['Int']['output'];
-};
-
-export enum GqlTaskStatus {
-  Backlog = 'BACKLOG',
-  Blocked = 'BLOCKED',
-  Cancelled = 'CANCELLED',
-  Done = 'DONE',
-  InProgress = 'IN_PROGRESS',
-  OnHold = 'ON_HOLD',
-  Ready = 'READY'
+/**
+ * Coarse daemon health verdict. Mirrors
+ * [`animus_control_protocol::types::DaemonHealthStatus`].
+ */
+export enum HealthStatus {
+  Degraded = 'DEGRADED',
+  Down = 'DOWN',
+  Healthy = 'HEALTHY',
+  Unhealthy = 'UNHEALTHY'
 }
 
-export enum GqlTaskType {
-  Bugfix = 'BUGFIX',
-  Chore = 'CHORE',
-  Docs = 'DOCS',
-  Experiment = 'EXPERIMENT',
-  Feature = 'FEATURE',
-  Hotfix = 'HOTFIX',
-  Refactor = 'REFACTOR',
-  Test = 'TEST'
-}
-
-export type GqlToolDefinition = {
-  __typename?: 'GqlToolDefinition';
-  contextWindow?: Maybe<Scalars['Int']['output']>;
-  executable: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  supportsMcp: Scalars['Boolean']['output'];
-  supportsWrite: Scalars['Boolean']['output'];
+export type InstallPluginInput = {
+  allowUnsigned?: Scalars['Boolean']['input'];
+  source: Scalars['String']['input'];
+  version?: InputMaybe<Scalars['String']['input']>;
+  yes?: Scalars['Boolean']['input'];
 };
-
-export type GqlVision = {
-  __typename?: 'GqlVision';
-  constraints: Array<Scalars['String']['output']>;
-  goals: Array<Scalars['String']['output']>;
-  raw: Scalars['String']['output'];
-  successCriteria: Array<Scalars['String']['output']>;
-  summary?: Maybe<Scalars['String']['output']>;
-  targetAudience?: Maybe<Scalars['String']['output']>;
-  title?: Maybe<Scalars['String']['output']>;
-};
-
-export type GqlWorkflow = {
-  __typename?: 'GqlWorkflow';
-  currentPhase?: Maybe<Scalars['String']['output']>;
-  decisions: Array<GqlDecision>;
-  id: Scalars['ID']['output'];
-  phases: Array<GqlPhaseExecution>;
-  status: GqlWorkflowStatus;
-  statusRaw: Scalars['String']['output'];
-  taskId: Scalars['String']['output'];
-  totalReworks: Scalars['Int']['output'];
-  workflowRef?: Maybe<Scalars['String']['output']>;
-};
-
-export type GqlWorkflowCheckpoint = {
-  __typename?: 'GqlWorkflowCheckpoint';
-  data?: Maybe<Scalars['String']['output']>;
-  id: Scalars['String']['output'];
-  phase: Scalars['String']['output'];
-  timestamp?: Maybe<Scalars['String']['output']>;
-};
-
-export type GqlWorkflowConfig = {
-  __typename?: 'GqlWorkflowConfig';
-  agentProfiles: Array<GqlAgentProfile>;
-  mcpServers: Array<GqlMcpServer>;
-  phaseCatalog: Array<GqlPhaseCatalogEntry>;
-  schedules: Array<GqlWorkflowSchedule>;
-  tools: Array<GqlToolDefinition>;
-};
-
-export type GqlWorkflowConnection = {
-  __typename?: 'GqlWorkflowConnection';
-  hasMore: Scalars['Boolean']['output'];
-  items: Array<GqlWorkflow>;
-  limit: Scalars['Int']['output'];
-  nextOffset?: Maybe<Scalars['Int']['output']>;
-  offset: Scalars['Int']['output'];
-  returned: Scalars['Int']['output'];
-  totalCount: Scalars['Int']['output'];
-};
-
-export type GqlWorkflowDefinition = {
-  __typename?: 'GqlWorkflowDefinition';
-  description?: Maybe<Scalars['String']['output']>;
-  id: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  phases: Array<Scalars['String']['output']>;
-};
-
-export type GqlWorkflowSchedule = {
-  __typename?: 'GqlWorkflowSchedule';
-  command?: Maybe<Scalars['String']['output']>;
-  cron: Scalars['String']['output'];
-  enabled: Scalars['Boolean']['output'];
-  id: Scalars['String']['output'];
-  workflowRef?: Maybe<Scalars['String']['output']>;
-};
-
-export enum GqlWorkflowStatus {
-  Cancelled = 'CANCELLED',
-  Completed = 'COMPLETED',
-  Escalated = 'ESCALATED',
-  Failed = 'FAILED',
-  Paused = 'PAUSED',
-  Pending = 'PENDING',
-  Running = 'RUNNING'
-}
 
 export type MutationRoot = {
   __typename?: 'MutationRoot';
-  approvePhase: GqlWorkflow;
-  archiveProject: GqlProject;
-  assignAgent: GqlTask;
-  assignHuman: GqlTask;
-  cancelWorkflow: GqlWorkflow;
-  checklistAdd: GqlTask;
-  checklistUpdate: GqlTask;
-  createProject: GqlProject;
-  createRequirement: GqlRequirement;
-  createTask: GqlTask;
-  daemonClearLogs: Scalars['Boolean']['output'];
-  daemonPause: Scalars['Boolean']['output'];
-  daemonResume: Scalars['Boolean']['output'];
-  daemonStart: Scalars['Boolean']['output'];
-  daemonStop: Scalars['Boolean']['output'];
-  deleteProject: Scalars['Boolean']['output'];
-  deleteRequirement: Scalars['Boolean']['output'];
-  deleteTask: Scalars['Boolean']['output'];
-  deleteWorkflowDefinition: Scalars['Boolean']['output'];
-  dependencyAdd: GqlTask;
-  dependencyRemove: GqlTask;
-  draftRequirement: GqlRequirement;
-  loadProject: GqlProject;
-  pauseWorkflow: GqlWorkflow;
-  queueHold: Scalars['Boolean']['output'];
-  queueRelease: Scalars['Boolean']['output'];
-  queueReorder: Scalars['Boolean']['output'];
-  refineRequirement: GqlRequirement;
-  refineVision: GqlVision;
-  resumeWorkflow: GqlWorkflow;
-  reviewHandoff: Scalars['Boolean']['output'];
-  runWorkflow: GqlWorkflow;
-  saveAgentProfile: Scalars['Boolean']['output'];
-  saveVision: GqlVision;
-  saveWorkflowConfig: Scalars['Boolean']['output'];
-  setDeadline: GqlTask;
-  updateProject: GqlProject;
-  updateRequirement: GqlRequirement;
-  updateTask: GqlTask;
-  updateTaskStatus: GqlTask;
-  upsertWorkflowDefinition: Scalars['Boolean']['output'];
-};
-
-
-export type MutationRootApprovePhaseArgs = {
-  note?: InputMaybe<Scalars['String']['input']>;
-  phaseId: Scalars['String']['input'];
-  workflowId: Scalars['ID']['input'];
-};
-
-
-export type MutationRootArchiveProjectArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootAssignAgentArgs = {
-  id: Scalars['ID']['input'];
-  model?: InputMaybe<Scalars['String']['input']>;
-  role?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type MutationRootAssignHumanArgs = {
-  id: Scalars['ID']['input'];
-  name: Scalars['String']['input'];
+  cancelWorkflow: Scalars['Boolean']['output'];
+  createSubject: Subject;
+  dropQueue: Scalars['Boolean']['output'];
+  enqueue: QueueEntry;
+  /** Execute a workflow definition directly, optionally bound to a subject. */
+  executeWorkflow: WorkflowRunStart;
+  holdQueue: Scalars['Boolean']['output'];
+  installPlugin: Plugin;
+  pauseWorkflow: Scalars['Boolean']['output'];
+  /** Lifecycle-ping a plugin. */
+  pingPlugin: PluginPing;
+  releaseQueue: Scalars['Boolean']['output'];
+  /**
+   * Reorder queue entries: move the given ids as a contiguous group to the
+   * front (default) or back of the queue.
+   */
+  reorderQueue: Scalars['Boolean']['output'];
+  resumeWorkflow: Scalars['Boolean']['output'];
+  /** Run a workflow for a subject/task. */
+  runWorkflow: WorkflowRunStart;
+  /** Set a subject's normalized status. */
+  setSubjectStatus: Subject;
+  /**
+   * Start the daemon. `daemon/stop` and `daemon/restart` are intentionally
+   * not exposed — the kernel forbids them over the control socket.
+   */
+  startDaemon: Scalars['Boolean']['output'];
+  uninstallPlugin: Scalars['Boolean']['output'];
+  /**
+   * Update installed plugins. With `dryRun = true`, lists available
+   * upgrades without applying them.
+   */
+  updatePlugins: Array<PluginUpdate>;
+  updateSubject: Subject;
 };
 
 
 export type MutationRootCancelWorkflowArgs = {
   id: Scalars['ID']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type MutationRootChecklistAddArgs = {
-  description: Scalars['String']['input'];
+export type MutationRootCreateSubjectArgs = {
+  input: CreateSubjectInput;
+};
+
+
+export type MutationRootDropQueueArgs = {
   id: Scalars['ID']['input'];
 };
 
 
-export type MutationRootChecklistUpdateArgs = {
-  completed?: InputMaybe<Scalars['Boolean']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
+export type MutationRootEnqueueArgs = {
+  input: EnqueueInput;
+};
+
+
+export type MutationRootExecuteWorkflowArgs = {
+  definition: Scalars['String']['input'];
+  subjectId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type MutationRootHoldQueueArgs = {
   id: Scalars['ID']['input'];
-  itemId: Scalars['String']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type MutationRootCreateProjectArgs = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  name: Scalars['String']['input'];
-  path: Scalars['String']['input'];
-  projectType?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type MutationRootCreateRequirementArgs = {
-  acceptanceCriteria?: InputMaybe<Array<Scalars['String']['input']>>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  title: Scalars['String']['input'];
-};
-
-
-export type MutationRootCreateTaskArgs = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
-  title: Scalars['String']['input'];
-};
-
-
-export type MutationRootDeleteProjectArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDeleteRequirementArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDeleteTaskArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDeleteWorkflowDefinitionArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDependencyAddArgs = {
-  dependencyType?: InputMaybe<Scalars['String']['input']>;
-  dependsOn: Scalars['String']['input'];
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDependencyRemoveArgs = {
-  dependsOn: Scalars['String']['input'];
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootDraftRequirementArgs = {
-  context?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type MutationRootLoadProjectArgs = {
-  id: Scalars['ID']['input'];
+export type MutationRootInstallPluginArgs = {
+  input: InstallPluginInput;
 };
 
 
@@ -607,30 +174,19 @@ export type MutationRootPauseWorkflowArgs = {
 };
 
 
-export type MutationRootQueueHoldArgs = {
-  reason?: InputMaybe<Scalars['String']['input']>;
-  taskId: Scalars['String']['input'];
+export type MutationRootPingPluginArgs = {
+  name: Scalars['String']['input'];
 };
 
 
-export type MutationRootQueueReleaseArgs = {
-  taskId: Scalars['String']['input'];
+export type MutationRootReleaseQueueArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
-export type MutationRootQueueReorderArgs = {
-  taskIds: Array<Scalars['String']['input']>;
-};
-
-
-export type MutationRootRefineRequirementArgs = {
-  feedback?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['String']['input'];
-};
-
-
-export type MutationRootRefineVisionArgs = {
-  feedback?: InputMaybe<Scalars['String']['input']>;
+export type MutationRootReorderQueueArgs = {
+  front?: Scalars['Boolean']['input'];
+  ids: Array<Scalars['ID']['input']>;
 };
 
 
@@ -640,214 +196,175 @@ export type MutationRootResumeWorkflowArgs = {
 };
 
 
-export type MutationRootReviewHandoffArgs = {
-  context?: InputMaybe<Scalars['String']['input']>;
-  question: Scalars['String']['input'];
-  targetRole: Scalars['String']['input'];
-};
-
-
 export type MutationRootRunWorkflowArgs = {
-  taskId: Scalars['String']['input'];
-  workflowRef?: InputMaybe<Scalars['String']['input']>;
+  definition?: InputMaybe<Scalars['String']['input']>;
+  taskId: Scalars['ID']['input'];
 };
 
 
-export type MutationRootSaveAgentProfileArgs = {
-  model?: InputMaybe<Scalars['String']['input']>;
+export type MutationRootSetSubjectStatusArgs = {
+  id: Scalars['ID']['input'];
+  status: SubjectStatus;
+};
+
+
+export type MutationRootUninstallPluginArgs = {
   name: Scalars['String']['input'];
-  role?: InputMaybe<Scalars['String']['input']>;
-  tool?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type MutationRootSaveVisionArgs = {
-  content: Scalars['String']['input'];
-};
-
-
-export type MutationRootSaveWorkflowConfigArgs = {
-  configJson: Scalars['String']['input'];
-};
-
-
-export type MutationRootSetDeadlineArgs = {
-  deadline?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['ID']['input'];
-};
-
-
-export type MutationRootUpdateProjectArgs = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['ID']['input'];
+export type MutationRootUpdatePluginsArgs = {
+  dryRun?: Scalars['Boolean']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
-  projectType?: InputMaybe<Scalars['String']['input']>;
+  tag?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type MutationRootUpdateRequirementArgs = {
-  acceptanceCriteria?: InputMaybe<Array<Scalars['String']['input']>>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['ID']['input'];
-  priority?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  title?: InputMaybe<Scalars['String']['input']>;
+export type MutationRootUpdateSubjectArgs = {
+  input: UpdateSubjectInput;
 };
 
-
-export type MutationRootUpdateTaskArgs = {
-  complexity?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['ID']['input'];
-  priority?: InputMaybe<Scalars['String']['input']>;
-  risk?: InputMaybe<Scalars['String']['input']>;
-  scope?: InputMaybe<Scalars['String']['input']>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
-  title?: InputMaybe<Scalars['String']['input']>;
+/**
+ * One installed plugin. Mirrors
+ * [`animus_control_protocol::types::PluginInfo`].
+ */
+export type Plugin = {
+  __typename?: 'Plugin';
+  binaryPath?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  /** Plugin name (manifest `name`); also serves as the GraphQL id. */
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  signatureVerified: Scalars['Boolean']['output'];
+  source?: Maybe<Scalars['String']['output']>;
+  version: Scalars['String']['output'];
 };
 
-
-export type MutationRootUpdateTaskStatusArgs = {
-  id: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
+/**
+ * Per-plugin health snapshot. Mirrors
+ * [`animus_control_protocol::types::PluginHealth`].
+ */
+export type PluginHealth = {
+  __typename?: 'PluginHealth';
+  kind: Scalars['String']['output'];
+  lastError?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  status: HealthStatus;
+  uptimeMs?: Maybe<Scalars['Int']['output']>;
 };
 
+/**
+ * Result of pinging a plugin. Mirrors
+ * [`animus_control_protocol::types::PluginPingResponse`].
+ */
+export type PluginPing = {
+  __typename?: 'PluginPing';
+  error?: Maybe<Scalars['String']['output']>;
+  latencyMs?: Maybe<Scalars['Int']['output']>;
+  ok: Scalars['Boolean']['output'];
+};
 
-export type MutationRootUpsertWorkflowDefinitionArgs = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['String']['input'];
-  name: Scalars['String']['input'];
-  phases: Scalars['String']['input'];
-  variables?: InputMaybe<Scalars['String']['input']>;
+/**
+ * A plugin registry entry, returned by search/browse. Mirrors
+ * [`animus_control_protocol::types::PluginRegistryEntry`].
+ */
+export type PluginRegistryEntry = {
+  __typename?: 'PluginRegistryEntry';
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  installed: Scalars['Boolean']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  tags: Array<Scalars['String']['output']>;
+  url?: Maybe<Scalars['String']['output']>;
+  version: Scalars['String']['output'];
+};
+
+/**
+ * One row of a plugin update. Mirrors
+ * [`animus_control_protocol::types::PluginUpdateEntry`].
+ */
+export type PluginUpdate = {
+  __typename?: 'PluginUpdate';
+  applied: Scalars['Boolean']['output'];
+  fromVersion: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  toVersion: Scalars['String']['output'];
 };
 
 export type QueryRoot = {
   __typename?: 'QueryRoot';
-  agentRuns: Array<GqlAgentRun>;
-  daemonHealth: GqlDaemonHealth;
-  daemonLogs: Array<GqlDaemonLog>;
-  daemonStatus: GqlDaemonStatus;
-  phaseOutput: GqlPhaseOutput;
-  project?: Maybe<GqlProject>;
-  projects: Array<GqlProject>;
-  projectsActive: Array<GqlProject>;
-  queue: Array<GqlQueueEntry>;
-  queueStats: GqlQueueStats;
-  readyTasks: Array<GqlTask>;
-  requirement?: Maybe<GqlRequirement>;
-  requirements: Array<GqlRequirement>;
-  requirementsPaginated: GqlRequirementConnection;
-  skillDetail?: Maybe<GqlSkillDetail>;
-  skills: Array<GqlSkill>;
-  systemInfo: GqlSystemInfo;
-  task?: Maybe<GqlTask>;
-  taskStats: GqlTaskStats;
-  tasks: Array<GqlTask>;
-  tasksNext?: Maybe<GqlTask>;
-  tasksPaginated: GqlTaskConnection;
-  tasksPrioritized: Array<GqlTask>;
-  vision?: Maybe<GqlVision>;
-  workflow?: Maybe<GqlWorkflow>;
-  workflowCheckpoints: Array<GqlWorkflowCheckpoint>;
-  workflowConfig: GqlWorkflowConfig;
-  workflowDefinitions: Array<GqlWorkflowDefinition>;
-  workflows: Array<GqlWorkflow>;
-  workflowsPaginated: GqlWorkflowConnection;
+  daemon: DaemonStatus;
+  /** Currently active agent sessions. */
+  daemonAgents: Array<DaemonAgent>;
+  daemonHealth: DaemonHealth;
+  /** List installed plugins, optionally filtered by kind. */
+  plugin: Array<Plugin>;
+  /** Browse the plugin registry. */
+  pluginBrowse: Array<PluginRegistryEntry>;
+  /** Look up a single installed plugin by name. */
+  pluginInfo: Plugin;
+  /** Search the plugin registry by free-text query. */
+  pluginSearch: Array<PluginRegistryEntry>;
+  /** List queue entries, optionally restricted to a state. */
+  queue: Array<QueueEntry>;
+  queueStats: QueueStats;
+  /** List subjects, optionally filtered by kind and/or status. */
+  subject: Array<Subject>;
+  /** Look up a single subject by id. */
+  subjectById: Subject;
+  /** Highest-priority Ready subject, optionally restricted to a kind. */
+  subjectNext?: Maybe<Subject>;
+  /** Look up a single workflow run by id, including full run detail. */
+  workflow: Workflow;
+  /** List workflow runs, optionally filtered by status. */
+  workflows: Array<Workflow>;
 };
 
 
-export type QueryRootDaemonLogsArgs = {
-  limit?: InputMaybe<Scalars['Int']['input']>;
+export type QueryRootPluginArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type QueryRootPhaseOutputArgs = {
-  phaseId?: InputMaybe<Scalars['String']['input']>;
-  tail?: InputMaybe<Scalars['Int']['input']>;
-  workflowId: Scalars['ID']['input'];
+export type QueryRootPluginBrowseArgs = {
+  available?: Scalars['Boolean']['input'];
+  installed?: Scalars['Boolean']['input'];
+  kind?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-export type QueryRootProjectArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type QueryRootReadyTasksArgs = {
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type QueryRootRequirementArgs = {
-  id: Scalars['ID']['input'];
-};
-
-
-export type QueryRootRequirementsArgs = {
-  category?: InputMaybe<Scalars['String']['input']>;
-  linkedTaskId?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  tags?: InputMaybe<Array<Scalars['String']['input']>>;
-};
-
-
-export type QueryRootRequirementsPaginatedArgs = {
-  category?: InputMaybe<Scalars['String']['input']>;
-  limit?: Scalars['Int']['input'];
-  linkedTaskId?: InputMaybe<Scalars['String']['input']>;
-  offset?: Scalars['Int']['input'];
-  priority?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  tags?: InputMaybe<Array<Scalars['String']['input']>>;
-};
-
-
-export type QueryRootSkillDetailArgs = {
+export type QueryRootPluginInfoArgs = {
   name: Scalars['String']['input'];
 };
 
 
-export type QueryRootTaskArgs = {
+export type QueryRootPluginSearchArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
+  query: Scalars['String']['input'];
+  tag?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryRootQueueArgs = {
+  state?: InputMaybe<QueueState>;
+};
+
+
+export type QueryRootSubjectArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<SubjectStatus>;
+};
+
+
+export type QueryRootSubjectByIdArgs = {
   id: Scalars['ID']['input'];
 };
 
 
-export type QueryRootTasksArgs = {
-  assigneeType?: InputMaybe<Scalars['String']['input']>;
-  linkedArchitectureEntity?: InputMaybe<Scalars['String']['input']>;
-  linkedRequirement?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  risk?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  tags?: InputMaybe<Array<Scalars['String']['input']>>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type QueryRootTasksPaginatedArgs = {
-  assigneeType?: InputMaybe<Scalars['String']['input']>;
-  limit?: Scalars['Int']['input'];
-  linkedArchitectureEntity?: InputMaybe<Scalars['String']['input']>;
-  linkedRequirement?: InputMaybe<Scalars['String']['input']>;
-  offset?: Scalars['Int']['input'];
-  priority?: InputMaybe<Scalars['String']['input']>;
-  risk?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  tags?: InputMaybe<Array<Scalars['String']['input']>>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
+export type QueryRootSubjectNextArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -856,467 +373,320 @@ export type QueryRootWorkflowArgs = {
 };
 
 
-export type QueryRootWorkflowCheckpointsArgs = {
-  workflowId: Scalars['ID']['input'];
-};
-
-
 export type QueryRootWorkflowsArgs = {
-  phaseId?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  taskId?: InputMaybe<Scalars['String']['input']>;
-  workflowRef?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<WorkflowStatus>;
 };
 
-
-export type QueryRootWorkflowsPaginatedArgs = {
-  limit?: Scalars['Int']['input'];
-  offset?: Scalars['Int']['input'];
-  phaseId?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  taskId?: InputMaybe<Scalars['String']['input']>;
-  workflowRef?: InputMaybe<Scalars['String']['input']>;
+/**
+ * One dispatch-queue entry. Mirrors
+ * [`animus_control_protocol::types::QueueEntry`].
+ */
+export type QueueEntry = {
+  __typename?: 'QueueEntry';
+  enqueuedAt: Scalars['String']['output'];
+  held: Scalars['Boolean']['output'];
+  holdReason?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** Priority on a 0..=4 scale (0 = none, 4 = critical). */
+  priority: Scalars['Int']['output'];
+  state: QueueState;
+  taskId: Scalars['ID']['output'];
 };
 
-export type SubscriptionRoot = {
-  __typename?: 'SubscriptionRoot';
-  daemonEvents: GqlDaemonEvent;
-  taskEvents: GqlDaemonEvent;
-  workflowEvents: GqlDaemonEvent;
+/**
+ * Coarse status of a queue entry. Mirrors
+ * [`animus_control_protocol::types::QueueEntryStatus`].
+ */
+export enum QueueState {
+  Done = 'DONE',
+  Dropped = 'DROPPED',
+  Held = 'HELD',
+  InFlight = 'IN_FLIGHT',
+  Ready = 'READY'
+}
+
+/**
+ * Aggregate queue counters. Mirrors
+ * [`animus_control_protocol::types::QueueStats`].
+ */
+export type QueueStats = {
+  __typename?: 'QueueStats';
+  doneRecent: Scalars['Int']['output'];
+  droppedRecent: Scalars['Int']['output'];
+  held: Scalars['Int']['output'];
+  inFlight: Scalars['Int']['output'];
+  ready: Scalars['Int']['output'];
+  /** Total live entries (ready + held + in-flight). */
+  total: Scalars['Int']['output'];
 };
 
-
-export type SubscriptionRootDaemonEventsArgs = {
-  eventType?: InputMaybe<Scalars['String']['input']>;
+/**
+ * A normalized cross-backend subject. Mirrors
+ * [`animus_subject_protocol::Subject`].
+ */
+export type Subject = {
+  __typename?: 'Subject';
+  assignee?: Maybe<Scalars['String']['output']>;
+  attachments: Array<SubjectAttachment>;
+  children: Array<Scalars['ID']['output']>;
+  createdAt: Scalars['String']['output'];
+  /** Backend-specific custom fields, serialized as a JSON string. */
+  custom?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  labels: Array<Scalars['String']['output']>;
+  /**
+   * Backend-raw status string (e.g. `"In Review"`), when richer than the
+   * normalized bucket.
+   */
+  nativeStatus?: Maybe<Scalars['String']['output']>;
+  parent?: Maybe<Scalars['ID']['output']>;
+  /** Priority on a 0..=4 scale. */
+  priority?: Maybe<Scalars['Int']['output']>;
+  status: SubjectStatus;
+  /** Free-form backend status payload, serialized as a JSON string. */
+  statusMetadata?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+  url?: Maybe<Scalars['String']['output']>;
 };
 
-
-export type SubscriptionRootTaskEventsArgs = {
-  taskId?: InputMaybe<Scalars['String']['input']>;
+/** An attachment carried by a [`Subject`]. */
+export type SubjectAttachment = {
+  __typename?: 'SubjectAttachment';
+  id: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  /** Free-form backend metadata, serialized as a JSON string. */
+  metadata?: Maybe<Scalars['String']['output']>;
+  mimeType?: Maybe<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+  uri: Scalars['String']['output'];
 };
 
+/**
+ * Normalized cross-backend subject status. Mirrors
+ * [`animus_subject_protocol::SubjectStatus`].
+ */
+export enum SubjectStatus {
+  Blocked = 'BLOCKED',
+  Cancelled = 'CANCELLED',
+  Done = 'DONE',
+  InProgress = 'IN_PROGRESS',
+  Ready = 'READY'
+}
 
-export type SubscriptionRootWorkflowEventsArgs = {
-  workflowId?: InputMaybe<Scalars['String']['input']>;
-};
-
-export type UpsertWorkflowDefinitionMutationVariables = Exact<{
-  id: Scalars['String']['input'];
-  name: Scalars['String']['input'];
-  description?: InputMaybe<Scalars['String']['input']>;
-  phases: Scalars['String']['input'];
-  variables?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type UpsertWorkflowDefinitionMutation = { __typename?: 'MutationRoot', upsertWorkflowDefinition: boolean };
-
-export type DeleteWorkflowDefinitionMutationVariables = Exact<{
+export type UpdateSubjectInput = {
+  /** `Some(...)` sets the assignee; pass an empty string to clear it. */
+  assignee?: InputMaybe<Scalars['String']['input']>;
+  comment?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
-}>;
+  labelsAdd?: Array<Scalars['String']['input']>;
+  labelsRemove?: Array<Scalars['String']['input']>;
+  status?: InputMaybe<SubjectStatus>;
+};
 
+/**
+ * A workflow run. Mirrors
+ * [`animus_control_protocol::types::WorkflowRunSummary`] plus the opaque
+ * `detail` blob from `WorkflowRun` (serialized as JSON when present).
+ */
+export type Workflow = {
+  __typename?: 'Workflow';
+  /** Workflow definition name. */
+  definition: Scalars['String']['output'];
+  /**
+   * Full run detail as a JSON string (phase history, decisions,
+   * checkpoints). Only populated by `workflow`-by-id lookups.
+   */
+  detail?: Maybe<Scalars['String']['output']>;
+  finishedAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  startedAt: Scalars['String']['output'];
+  status: WorkflowStatus;
+  subjectId?: Maybe<Scalars['ID']['output']>;
+};
 
-export type DeleteWorkflowDefinitionMutation = { __typename?: 'MutationRoot', deleteWorkflowDefinition: boolean };
+/**
+ * Result of starting a workflow. Mirrors
+ * [`animus_control_protocol::types::WorkflowRunStart`].
+ */
+export type WorkflowRunStart = {
+  __typename?: 'WorkflowRunStart';
+  startedAt: Scalars['String']['output'];
+  status?: Maybe<WorkflowStatus>;
+  workflowId: Scalars['ID']['output'];
+};
+
+/**
+ * Workflow lifecycle status. Mirrors
+ * [`animus_control_protocol::types::WorkflowStatus`].
+ */
+export enum WorkflowStatus {
+  Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Paused = 'PAUSED',
+  Pending = 'PENDING',
+  Running = 'RUNNING'
+}
 
 export type DaemonQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DaemonQuery = { __typename?: 'QueryRoot', daemonStatus: { __typename?: 'GqlDaemonStatus', healthy: boolean, status: GqlDaemonStatusValue, statusRaw?: string | null, runnerConnected: boolean, activeAgents: number, maxAgents?: number | null, projectRoot?: string | null }, daemonHealth: { __typename?: 'GqlDaemonHealth', healthy: boolean, status: string, runnerConnected: boolean, runnerPid?: number | null, activeAgents: number, daemonPid?: number | null }, agentRuns: Array<{ __typename?: 'GqlAgentRun', runId: string, taskId?: string | null, taskTitle?: string | null, workflowId?: string | null, phaseId?: string | null, status: string }>, daemonLogs: Array<{ __typename?: 'GqlDaemonLog', timestamp?: string | null, level?: string | null, message?: string | null }> };
+export type DaemonQuery = { __typename?: 'QueryRoot', daemon: { __typename?: 'DaemonStatus', running: boolean, pid?: number | null, uptimeSeconds?: number | null, version?: string | null, projectRoot?: string | null, logPath?: string | null }, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, status: HealthStatus, lastError?: string | null, plugins: Array<{ __typename?: 'PluginHealth', name: string, kind: string, status: HealthStatus, uptimeMs?: number | null, lastError?: string | null }> }, daemonAgents: Array<{ __typename?: 'DaemonAgent', sessionId: string, provider: string, model: string, workflowId?: string | null, phaseId?: string | null, startedAt: string }> };
 
-export type DaemonStartMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type DaemonStartMutation = { __typename?: 'MutationRoot', daemonStart: boolean };
-
-export type DaemonStopMutationVariables = Exact<{ [key: string]: never; }>;
+export type StartDaemonMutationVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DaemonStopMutation = { __typename?: 'MutationRoot', daemonStop: boolean };
-
-export type DaemonPauseMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type DaemonPauseMutation = { __typename?: 'MutationRoot', daemonPause: boolean };
-
-export type DaemonResumeMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type DaemonResumeMutation = { __typename?: 'MutationRoot', daemonResume: boolean };
-
-export type DaemonClearLogsMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type DaemonClearLogsMutation = { __typename?: 'MutationRoot', daemonClearLogs: boolean };
+export type StartDaemonMutation = { __typename?: 'MutationRoot', startDaemon: boolean };
 
 export type DashboardQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DashboardQuery = { __typename?: 'QueryRoot', taskStats: { __typename?: 'GqlTaskStats', total: number, byStatus?: string | null, byPriority?: string | null }, daemonHealth: { __typename?: 'GqlDaemonHealth', healthy: boolean, status: string, runnerConnected: boolean, daemonPid?: number | null, activeDaemons: number }, agentRuns: Array<{ __typename?: 'GqlAgentRun', runId: string, taskId?: string | null, taskTitle?: string | null, workflowId?: string | null, phaseId?: string | null, status: string }>, systemInfo: { __typename?: 'GqlSystemInfo', platform?: string | null, version?: string | null, daemonStatus?: string | null, projectRoot?: string | null }, queueStats: { __typename?: 'GqlQueueStats', depth: number } };
+export type DashboardQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, status: SubjectStatus, priority?: number | null }>, daemon: { __typename?: 'DaemonStatus', running: boolean, version?: string | null, projectRoot?: string | null }, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, status: HealthStatus, plugins: Array<{ __typename?: 'PluginHealth', name: string, kind: string, status: HealthStatus }> }, daemonAgents: Array<{ __typename?: 'DaemonAgent', sessionId: string, provider: string, model: string, workflowId?: string | null, phaseId?: string | null }>, queueStats: { __typename?: 'QueueStats', total: number, ready: number, held: number, inFlight: number } };
 
-export type ReadyTasksQueryVariables = Exact<{
-  search?: InputMaybe<Scalars['String']['input']>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
+export type ReadySubjectsQueryVariables = Exact<{
+  kind?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type ReadyTasksQuery = { __typename?: 'QueryRoot', readyTasks: Array<{ __typename?: 'GqlTask', id: string, title: string, statusRaw: string, priorityRaw: string, taskTypeRaw: string }> };
-
-export type WorkflowDefinitionsQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type WorkflowDefinitionsQuery = { __typename?: 'QueryRoot', workflowDefinitions: Array<{ __typename?: 'GqlWorkflowDefinition', id: string, name: string, description?: string | null, phases: Array<string> }> };
+export type ReadySubjectsQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, title: string, status: SubjectStatus, priority?: number | null, labels: Array<string> }> };
 
 export type DispatchRequirementsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DispatchRequirementsQuery = { __typename?: 'QueryRoot', requirements: Array<{ __typename?: 'GqlRequirement', id: string, title: string, description: string, priorityRaw: string, statusRaw: string, requirementType?: GqlRequirementType | null, tags: Array<string>, linkedTaskIds: Array<string>, acceptanceCriteria: Array<string> }> };
+export type DispatchRequirementsQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, title: string, description?: string | null, status: SubjectStatus, priority?: number | null, labels: Array<string>, children: Array<string> }> };
 
-export type DaemonEventsSubscriptionVariables = Exact<{
-  eventType?: InputMaybe<Scalars['String']['input']>;
+export type DaemonActivityQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DaemonActivityQuery = { __typename?: 'QueryRoot', daemonAgents: Array<{ __typename?: 'DaemonAgent', sessionId: string, provider: string, model: string, workflowId?: string | null, phaseId?: string | null, startedAt: string }>, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, status: HealthStatus, lastError?: string | null } };
+
+export type QueueQueryVariables = Exact<{
+  state?: InputMaybe<QueueState>;
 }>;
 
 
-export type DaemonEventsSubscription = { __typename?: 'SubscriptionRoot', daemonEvents: { __typename?: 'GqlDaemonEvent', id: string, seq: number, timestamp: string, eventType: string, data: string } };
+export type QueueQuery = { __typename?: 'QueryRoot', queue: Array<{ __typename?: 'QueueEntry', id: string, taskId: string, priority: number, state: QueueState, enqueuedAt: string, held: boolean, holdReason?: string | null }>, queueStats: { __typename?: 'QueueStats', total: number, ready: number, held: number, inFlight: number, doneRecent: number, droppedRecent: number } };
 
-export type VisionQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type VisionQuery = { __typename?: 'QueryRoot', vision?: { __typename?: 'GqlVision', title?: string | null, summary?: string | null, goals: Array<string>, targetAudience?: string | null, successCriteria: Array<string>, constraints: Array<string>, raw: string } | null };
-
-export type RequirementsQueryVariables = Exact<{ [key: string]: never; }>;
+export type EnqueueMutationVariables = Exact<{
+  input: EnqueueInput;
+}>;
 
 
-export type RequirementsQuery = { __typename?: 'QueryRoot', requirements: Array<{ __typename?: 'GqlRequirement', id: string, title: string, description: string, priority: GqlRequirementPriority, priorityRaw: string, status: GqlRequirementStatus, statusRaw: string, requirementType?: GqlRequirementType | null, tags: Array<string>, linkedTaskIds: Array<string>, acceptanceCriteria: Array<string> }> };
+export type EnqueueMutation = { __typename?: 'MutationRoot', enqueue: { __typename?: 'QueueEntry', id: string, taskId: string, state: QueueState } };
 
-export type RequirementQueryVariables = Exact<{
+export type HoldQueueMutationVariables = Exact<{
   id: Scalars['ID']['input'];
-}>;
-
-
-export type RequirementQuery = { __typename?: 'QueryRoot', requirement?: { __typename?: 'GqlRequirement', id: string, title: string, description: string, priority: GqlRequirementPriority, priorityRaw: string, status: GqlRequirementStatus, statusRaw: string, requirementType?: GqlRequirementType | null, tags: Array<string>, linkedTaskIds: Array<string>, acceptanceCriteria: Array<string> } | null };
-
-export type RequirementDetailQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type RequirementDetailQuery = { __typename?: 'QueryRoot', requirement?: { __typename?: 'GqlRequirement', id: string, title: string, description: string, priority: GqlRequirementPriority, priorityRaw: string, status: GqlRequirementStatus, statusRaw: string, requirementType?: GqlRequirementType | null, tags: Array<string>, linkedTaskIds: Array<string>, acceptanceCriteria: Array<string> } | null };
-
-export type SaveVisionMutationVariables = Exact<{
-  content: Scalars['String']['input'];
-}>;
-
-
-export type SaveVisionMutation = { __typename?: 'MutationRoot', saveVision: { __typename?: 'GqlVision', title?: string | null, summary?: string | null, goals: Array<string>, targetAudience?: string | null, successCriteria: Array<string>, constraints: Array<string>, raw: string } };
-
-export type RefineVisionMutationVariables = Exact<{
-  feedback?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type RefineVisionMutation = { __typename?: 'MutationRoot', refineVision: { __typename?: 'GqlVision', title?: string | null, summary?: string | null, goals: Array<string>, targetAudience?: string | null, successCriteria: Array<string>, constraints: Array<string>, raw: string } };
-
-export type CreateRequirementMutationVariables = Exact<{
-  title: Scalars['String']['input'];
-  description?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  acceptanceCriteria?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
-}>;
-
-
-export type CreateRequirementMutation = { __typename?: 'MutationRoot', createRequirement: { __typename?: 'GqlRequirement', id: string } };
-
-export type UpdateRequirementMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  title?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
-  requirementType?: InputMaybe<Scalars['String']['input']>;
-  acceptanceCriteria?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
-}>;
-
-
-export type UpdateRequirementMutation = { __typename?: 'MutationRoot', updateRequirement: { __typename?: 'GqlRequirement', id: string } };
-
-export type DeleteRequirementMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type DeleteRequirementMutation = { __typename?: 'MutationRoot', deleteRequirement: boolean };
-
-export type DraftRequirementMutationVariables = Exact<{
-  context?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type DraftRequirementMutation = { __typename?: 'MutationRoot', draftRequirement: { __typename?: 'GqlRequirement', id: string, title: string } };
-
-export type RefineRequirementMutationVariables = Exact<{
-  id: Scalars['String']['input'];
-  feedback?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type RefineRequirementMutation = { __typename?: 'MutationRoot', refineRequirement: { __typename?: 'GqlRequirement', id: string } };
-
-export type ProjectsQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type ProjectsQuery = { __typename?: 'QueryRoot', projects: Array<{ __typename?: 'GqlProject', id: string, name?: string | null, path?: string | null, description?: string | null, archived: boolean }>, projectsActive: Array<{ __typename?: 'GqlProject', id: string, name?: string | null, path?: string | null }> };
-
-export type ProjectDetailQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type ProjectDetailQuery = { __typename?: 'QueryRoot', project?: { __typename?: 'GqlProject', id: string, name?: string | null, path?: string | null, description?: string | null, type?: string | null, techStack: Array<string>, archived: boolean } | null };
-
-export type CreateProjectMutationVariables = Exact<{
-  name: Scalars['String']['input'];
-  path: Scalars['String']['input'];
-  description?: InputMaybe<Scalars['String']['input']>;
-  projectType?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type CreateProjectMutation = { __typename?: 'MutationRoot', createProject: { __typename?: 'GqlProject', id: string, name?: string | null } };
-
-export type UpdateProjectMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  name?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  projectType?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type UpdateProjectMutation = { __typename?: 'MutationRoot', updateProject: { __typename?: 'GqlProject', id: string, name?: string | null } };
-
-export type DeleteProjectMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type DeleteProjectMutation = { __typename?: 'MutationRoot', deleteProject: boolean };
-
-export type LoadProjectMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type LoadProjectMutation = { __typename?: 'MutationRoot', loadProject: { __typename?: 'GqlProject', id: string, name?: string | null } };
-
-export type ArchiveProjectMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type ArchiveProjectMutation = { __typename?: 'MutationRoot', archiveProject: { __typename?: 'GqlProject', id: string, name?: string | null, archived: boolean } };
-
-export type QueueQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type QueueQuery = { __typename?: 'QueryRoot', queue: Array<{ __typename?: 'GqlQueueEntry', taskId: string, title?: string | null, priority?: GqlPriority | null, status?: GqlTaskStatus | null, waitTime?: number | null, position?: number | null }>, queueStats: { __typename?: 'GqlQueueStats', depth: number, readyCount: number, heldCount: number, avgWait?: number | null, throughput?: number | null } };
-
-export type QueueHoldMutationVariables = Exact<{
-  taskId: Scalars['String']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type QueueHoldMutation = { __typename?: 'MutationRoot', queueHold: boolean };
+export type HoldQueueMutation = { __typename?: 'MutationRoot', holdQueue: boolean };
 
-export type QueueReleaseMutationVariables = Exact<{
-  taskId: Scalars['String']['input'];
-}>;
-
-
-export type QueueReleaseMutation = { __typename?: 'MutationRoot', queueRelease: boolean };
-
-export type QueueReorderMutationVariables = Exact<{
-  taskIds: Array<Scalars['String']['input']> | Scalars['String']['input'];
-}>;
-
-
-export type QueueReorderMutation = { __typename?: 'MutationRoot', queueReorder: boolean };
-
-export type ReviewHandoffMutationVariables = Exact<{
-  targetRole: Scalars['String']['input'];
-  question: Scalars['String']['input'];
-  context?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type ReviewHandoffMutation = { __typename?: 'MutationRoot', reviewHandoff: boolean };
-
-export type SaveAgentProfileMutationVariables = Exact<{
-  name: Scalars['String']['input'];
-  model?: InputMaybe<Scalars['String']['input']>;
-  tool?: InputMaybe<Scalars['String']['input']>;
-  role?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type SaveAgentProfileMutation = { __typename?: 'MutationRoot', saveAgentProfile: boolean };
-
-export type WorkflowConfigQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type WorkflowConfigQuery = { __typename?: 'QueryRoot', workflowConfig: { __typename?: 'GqlWorkflowConfig', mcpServers: Array<{ __typename?: 'GqlMcpServer', name: string, command: string, args: Array<string>, transport?: string | null, tools: Array<string>, env: Array<{ __typename?: 'GqlKeyValue', key: string, value: string }> }>, phaseCatalog: Array<{ __typename?: 'GqlPhaseCatalogEntry', id: string, label: string, description: string, category: string, tags: Array<string> }>, tools: Array<{ __typename?: 'GqlToolDefinition', name: string, executable: string, supportsMcp: boolean, supportsWrite: boolean, contextWindow?: number | null }>, agentProfiles: Array<{ __typename?: 'GqlAgentProfile', name: string, description: string, role?: string | null, mcpServers: Array<string>, skills: Array<string>, tool?: string | null, model?: string | null }>, schedules: Array<{ __typename?: 'GqlWorkflowSchedule', id: string, cron: string, workflowRef?: string | null, command?: string | null, enabled: boolean }> } };
-
-export type TasksQueryVariables = Exact<{
-  status?: InputMaybe<Scalars['String']['input']>;
-  search?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type TasksQuery = { __typename?: 'QueryRoot', tasks: Array<{ __typename?: 'GqlTask', id: string, title: string, status: GqlTaskStatus, statusRaw: string, priority: GqlPriority, priorityRaw: string, taskType: GqlTaskType, taskTypeRaw: string, tags: Array<string>, linkedRequirementIds: Array<string>, deadline?: string | null }>, taskStats: { __typename?: 'GqlTaskStats', total: number, byStatus?: string | null, byPriority?: string | null } };
-
-export type TasksPrioritizedQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type TasksPrioritizedQuery = { __typename?: 'QueryRoot', tasksPrioritized: Array<{ __typename?: 'GqlTask', id: string, title: string, status: GqlTaskStatus, statusRaw: string, priority: GqlPriority, priorityRaw: string, taskType: GqlTaskType, taskTypeRaw: string, tags: Array<string> }> };
-
-export type TaskDetailQueryVariables = Exact<{
+export type ReleaseQueueMutationVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type TaskDetailQuery = { __typename?: 'QueryRoot', task?: { __typename?: 'GqlTask', id: string, title: string, description: string, status: GqlTaskStatus, statusRaw: string, priority: GqlPriority, priorityRaw: string, taskType: GqlTaskType, taskTypeRaw: string, risk: GqlRiskLevel, scope: GqlScope, complexity: GqlComplexity, tags: Array<string>, linkedRequirementIds: Array<string>, deadline?: string | null, checklist: Array<{ __typename?: 'GqlChecklist', id: string, description: string, completed: boolean }>, dependencies: Array<{ __typename?: 'GqlDependency', taskId: string, type: string }> } | null };
+export type ReleaseQueueMutation = { __typename?: 'MutationRoot', releaseQueue: boolean };
 
-export type UpdateTaskStatusMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
-}>;
-
-
-export type UpdateTaskStatusMutation = { __typename?: 'MutationRoot', updateTaskStatus: { __typename?: 'GqlTask', id: string, status: GqlTaskStatus, statusRaw: string } };
-
-export type CreateTaskMutationVariables = Exact<{
-  title: Scalars['String']['input'];
-  description?: InputMaybe<Scalars['String']['input']>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type CreateTaskMutation = { __typename?: 'MutationRoot', createTask: { __typename?: 'GqlTask', id: string, title: string, status: GqlTaskStatus, statusRaw: string } };
-
-export type UpdateTaskMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  title?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-  taskType?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['String']['input']>;
-  risk?: InputMaybe<Scalars['String']['input']>;
-  scope?: InputMaybe<Scalars['String']['input']>;
-  complexity?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type UpdateTaskMutation = { __typename?: 'MutationRoot', updateTask: { __typename?: 'GqlTask', id: string, title: string, status: GqlTaskStatus, statusRaw: string } };
-
-export type DeleteTaskMutationVariables = Exact<{
+export type DropQueueMutationVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type DeleteTaskMutation = { __typename?: 'MutationRoot', deleteTask: boolean };
+export type DropQueueMutation = { __typename?: 'MutationRoot', dropQueue: boolean };
 
-export type SetDeadlineMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  deadline?: InputMaybe<Scalars['String']['input']>;
+export type ReorderQueueMutationVariables = Exact<{
+  ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+  front?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type SetDeadlineMutation = { __typename?: 'MutationRoot', setDeadline: { __typename?: 'GqlTask', id: string, deadline?: string | null } };
+export type ReorderQueueMutation = { __typename?: 'MutationRoot', reorderQueue: boolean };
 
-export type AssignAgentMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  role?: InputMaybe<Scalars['String']['input']>;
-  model?: InputMaybe<Scalars['String']['input']>;
+export type SubjectsQueryVariables = Exact<{
+  kind?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<SubjectStatus>;
 }>;
 
 
-export type AssignAgentMutation = { __typename?: 'MutationRoot', assignAgent: { __typename?: 'GqlTask', id: string } };
+export type SubjectsQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, kind: string, title: string, description?: string | null, status: SubjectStatus, nativeStatus?: string | null, priority?: number | null, assignee?: string | null, labels: Array<string>, parent?: string | null, children: Array<string>, url?: string | null, createdAt: string, updatedAt: string }> };
 
-export type AssignHumanMutationVariables = Exact<{
+export type SubjectDetailQueryVariables = Exact<{
   id: Scalars['ID']['input'];
-  name: Scalars['String']['input'];
 }>;
 
 
-export type AssignHumanMutation = { __typename?: 'MutationRoot', assignHuman: { __typename?: 'GqlTask', id: string } };
+export type SubjectDetailQuery = { __typename?: 'QueryRoot', subjectById: { __typename?: 'Subject', id: string, kind: string, title: string, description?: string | null, status: SubjectStatus, nativeStatus?: string | null, statusMetadata?: string | null, priority?: number | null, assignee?: string | null, labels: Array<string>, parent?: string | null, children: Array<string>, url?: string | null, createdAt: string, updatedAt: string, custom?: string | null, attachments: Array<{ __typename?: 'SubjectAttachment', id: string, kind: string, uri: string, title?: string | null, mimeType?: string | null, metadata?: string | null }> } };
 
-export type ChecklistAddMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  description: Scalars['String']['input'];
+export type SubjectNextQueryVariables = Exact<{
+  kind?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type ChecklistAddMutation = { __typename?: 'MutationRoot', checklistAdd: { __typename?: 'GqlTask', id: string, checklist: Array<{ __typename?: 'GqlChecklist', id: string, description: string, completed: boolean }> } };
+export type SubjectNextQuery = { __typename?: 'QueryRoot', subjectNext?: { __typename?: 'Subject', id: string, kind: string, title: string, status: SubjectStatus, priority?: number | null } | null };
 
-export type ChecklistUpdateMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  itemId: Scalars['String']['input'];
-  completed?: InputMaybe<Scalars['Boolean']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
+export type CreateSubjectMutationVariables = Exact<{
+  input: CreateSubjectInput;
 }>;
 
 
-export type ChecklistUpdateMutation = { __typename?: 'MutationRoot', checklistUpdate: { __typename?: 'GqlTask', id: string, checklist: Array<{ __typename?: 'GqlChecklist', id: string, description: string, completed: boolean }> } };
+export type CreateSubjectMutation = { __typename?: 'MutationRoot', createSubject: { __typename?: 'Subject', id: string, kind: string, title: string, status: SubjectStatus } };
 
-export type DependencyAddMutationVariables = Exact<{
-  id: Scalars['ID']['input'];
-  dependsOn: Scalars['String']['input'];
-  dependencyType?: InputMaybe<Scalars['String']['input']>;
+export type UpdateSubjectMutationVariables = Exact<{
+  input: UpdateSubjectInput;
 }>;
 
 
-export type DependencyAddMutation = { __typename?: 'MutationRoot', dependencyAdd: { __typename?: 'GqlTask', id: string, dependencies: Array<{ __typename?: 'GqlDependency', taskId: string, type: string }> } };
+export type UpdateSubjectMutation = { __typename?: 'MutationRoot', updateSubject: { __typename?: 'Subject', id: string, status: SubjectStatus, assignee?: string | null, labels: Array<string> } };
 
-export type DependencyRemoveMutationVariables = Exact<{
+export type SetSubjectStatusMutationVariables = Exact<{
   id: Scalars['ID']['input'];
-  dependsOn: Scalars['String']['input'];
+  status: SubjectStatus;
 }>;
 
 
-export type DependencyRemoveMutation = { __typename?: 'MutationRoot', dependencyRemove: { __typename?: 'GqlTask', id: string, dependencies: Array<{ __typename?: 'GqlDependency', taskId: string, type: string }> } };
+export type SetSubjectStatusMutation = { __typename?: 'MutationRoot', setSubjectStatus: { __typename?: 'Subject', id: string, status: SubjectStatus, nativeStatus?: string | null } };
 
 export type WorkflowsQueryVariables = Exact<{
-  status?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<WorkflowStatus>;
 }>;
 
 
-export type WorkflowsQuery = { __typename?: 'QueryRoot', workflows: Array<{ __typename?: 'GqlWorkflow', id: string, taskId: string, workflowRef?: string | null, status: GqlWorkflowStatus, statusRaw: string, currentPhase?: string | null, totalReworks: number, phases: Array<{ __typename?: 'GqlPhaseExecution', phaseId: string, status: string, startedAt?: string | null, completedAt?: string | null, attempt: number, errorMessage?: string | null }> }> };
+export type WorkflowsQuery = { __typename?: 'QueryRoot', workflows: Array<{ __typename?: 'Workflow', id: string, definition: string, status: WorkflowStatus, subjectId?: string | null, startedAt: string, finishedAt?: string | null }> };
 
 export type WorkflowDetailQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type WorkflowDetailQuery = { __typename?: 'QueryRoot', workflow?: { __typename?: 'GqlWorkflow', id: string, taskId: string, workflowRef?: string | null, status: GqlWorkflowStatus, statusRaw: string, currentPhase?: string | null, totalReworks: number, phases: Array<{ __typename?: 'GqlPhaseExecution', phaseId: string, status: string, startedAt?: string | null, completedAt?: string | null, attempt: number, errorMessage?: string | null }>, decisions: Array<{ __typename?: 'GqlDecision', timestamp: string, phaseId: string, source: string, decision: string, targetPhase?: string | null, reason: string, confidence: number, risk: string }> } | null, workflowCheckpoints: Array<{ __typename?: 'GqlWorkflowCheckpoint', id: string, phase: string, timestamp?: string | null, data?: string | null }> };
+export type WorkflowDetailQuery = { __typename?: 'QueryRoot', workflow: { __typename?: 'Workflow', id: string, definition: string, status: WorkflowStatus, subjectId?: string | null, startedAt: string, finishedAt?: string | null, detail?: string | null } };
 
 export type RunWorkflowMutationVariables = Exact<{
-  taskId: Scalars['String']['input'];
-  workflowRef?: InputMaybe<Scalars['String']['input']>;
+  taskId: Scalars['ID']['input'];
+  definition?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type RunWorkflowMutation = { __typename?: 'MutationRoot', runWorkflow: { __typename?: 'GqlWorkflow', id: string, taskId: string, status: GqlWorkflowStatus, statusRaw: string } };
+export type RunWorkflowMutation = { __typename?: 'MutationRoot', runWorkflow: { __typename?: 'WorkflowRunStart', workflowId: string, status?: WorkflowStatus | null, startedAt: string } };
+
+export type ExecuteWorkflowMutationVariables = Exact<{
+  definition: Scalars['String']['input'];
+  subjectId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type ExecuteWorkflowMutation = { __typename?: 'MutationRoot', executeWorkflow: { __typename?: 'WorkflowRunStart', workflowId: string, status?: WorkflowStatus | null, startedAt: string } };
 
 export type PauseWorkflowMutationVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type PauseWorkflowMutation = { __typename?: 'MutationRoot', pauseWorkflow: { __typename?: 'GqlWorkflow', id: string, status: GqlWorkflowStatus } };
+export type PauseWorkflowMutation = { __typename?: 'MutationRoot', pauseWorkflow: boolean };
 
 export type ResumeWorkflowMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1324,30 +694,15 @@ export type ResumeWorkflowMutationVariables = Exact<{
 }>;
 
 
-export type ResumeWorkflowMutation = { __typename?: 'MutationRoot', resumeWorkflow: { __typename?: 'GqlWorkflow', id: string, status: GqlWorkflowStatus } };
+export type ResumeWorkflowMutation = { __typename?: 'MutationRoot', resumeWorkflow: boolean };
 
 export type CancelWorkflowMutationVariables = Exact<{
   id: Scalars['ID']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type CancelWorkflowMutation = { __typename?: 'MutationRoot', cancelWorkflow: { __typename?: 'GqlWorkflow', id: string, status: GqlWorkflowStatus } };
-
-export type ApprovePhaseMutationVariables = Exact<{
-  workflowId: Scalars['ID']['input'];
-  phaseId: Scalars['String']['input'];
-  note?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type ApprovePhaseMutation = { __typename?: 'MutationRoot', approvePhase: { __typename?: 'GqlWorkflow', id: string, status: GqlWorkflowStatus, statusRaw: string, currentPhase?: string | null } };
-
-export type WorkflowEventsSubscriptionVariables = Exact<{
-  workflowId?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type WorkflowEventsSubscription = { __typename?: 'SubscriptionRoot', workflowEvents: { __typename?: 'GqlDaemonEvent', id: string, seq: number, timestamp: string, eventType: string, data: string } };
+export type CancelWorkflowMutation = { __typename?: 'MutationRoot', cancelWorkflow: boolean };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -1368,673 +723,269 @@ export class TypedDocumentString<TResult, TVariables>
   }
 }
 
-export const UpsertWorkflowDefinitionDocument = new TypedDocumentString(`
-    mutation UpsertWorkflowDefinition($id: String!, $name: String!, $description: String, $phases: String!, $variables: String) {
-  upsertWorkflowDefinition(
-    id: $id
-    name: $name
-    description: $description
-    phases: $phases
-    variables: $variables
-  )
-}
-    `) as unknown as TypedDocumentString<UpsertWorkflowDefinitionMutation, UpsertWorkflowDefinitionMutationVariables>;
-export const DeleteWorkflowDefinitionDocument = new TypedDocumentString(`
-    mutation DeleteWorkflowDefinition($id: ID!) {
-  deleteWorkflowDefinition(id: $id)
-}
-    `) as unknown as TypedDocumentString<DeleteWorkflowDefinitionMutation, DeleteWorkflowDefinitionMutationVariables>;
 export const DaemonDocument = new TypedDocumentString(`
     query Daemon {
-  daemonStatus {
-    healthy
-    status
-    statusRaw
-    runnerConnected
-    activeAgents
-    maxAgents
+  daemon {
+    running
+    pid
+    uptimeSeconds
+    version
     projectRoot
+    logPath
   }
   daemonHealth {
     healthy
     status
-    runnerConnected
-    runnerPid
-    activeAgents
-    daemonPid
+    lastError
+    plugins {
+      name
+      kind
+      status
+      uptimeMs
+      lastError
+    }
   }
-  agentRuns {
-    runId
-    taskId
-    taskTitle
+  daemonAgents {
+    sessionId
+    provider
+    model
     workflowId
     phaseId
-    status
-  }
-  daemonLogs(limit: 50) {
-    timestamp
-    level
-    message
+    startedAt
   }
 }
     `) as unknown as TypedDocumentString<DaemonQuery, DaemonQueryVariables>;
-export const DaemonStartDocument = new TypedDocumentString(`
-    mutation DaemonStart {
-  daemonStart
+export const StartDaemonDocument = new TypedDocumentString(`
+    mutation StartDaemon {
+  startDaemon
 }
-    `) as unknown as TypedDocumentString<DaemonStartMutation, DaemonStartMutationVariables>;
-export const DaemonStopDocument = new TypedDocumentString(`
-    mutation DaemonStop {
-  daemonStop
-}
-    `) as unknown as TypedDocumentString<DaemonStopMutation, DaemonStopMutationVariables>;
-export const DaemonPauseDocument = new TypedDocumentString(`
-    mutation DaemonPause {
-  daemonPause
-}
-    `) as unknown as TypedDocumentString<DaemonPauseMutation, DaemonPauseMutationVariables>;
-export const DaemonResumeDocument = new TypedDocumentString(`
-    mutation DaemonResume {
-  daemonResume
-}
-    `) as unknown as TypedDocumentString<DaemonResumeMutation, DaemonResumeMutationVariables>;
-export const DaemonClearLogsDocument = new TypedDocumentString(`
-    mutation DaemonClearLogs {
-  daemonClearLogs
-}
-    `) as unknown as TypedDocumentString<DaemonClearLogsMutation, DaemonClearLogsMutationVariables>;
+    `) as unknown as TypedDocumentString<StartDaemonMutation, StartDaemonMutationVariables>;
 export const DashboardDocument = new TypedDocumentString(`
     query Dashboard {
-  taskStats {
-    total
-    byStatus
-    byPriority
+  subject(kind: "task") {
+    id
+    status
+    priority
+  }
+  daemon {
+    running
+    version
+    projectRoot
   }
   daemonHealth {
     healthy
     status
-    runnerConnected
-    activeDaemons: activeAgents
-    daemonPid
+    plugins {
+      name
+      kind
+      status
+    }
   }
-  agentRuns {
-    runId
-    taskId
-    taskTitle
+  daemonAgents {
+    sessionId
+    provider
+    model
     workflowId
     phaseId
-    status
-  }
-  systemInfo {
-    platform
-    version
-    daemonStatus
-    projectRoot
   }
   queueStats {
-    depth
+    total
+    ready
+    held
+    inFlight
   }
 }
     `) as unknown as TypedDocumentString<DashboardQuery, DashboardQueryVariables>;
-export const ReadyTasksDocument = new TypedDocumentString(`
-    query ReadyTasks($search: String, $limit: Int) {
-  readyTasks(search: $search, limit: $limit) {
+export const ReadySubjectsDocument = new TypedDocumentString(`
+    query ReadySubjects($kind: String) {
+  subject(kind: $kind, status: READY) {
     id
     title
-    statusRaw
-    priorityRaw
-    taskTypeRaw
+    status
+    priority
+    labels
   }
 }
-    `) as unknown as TypedDocumentString<ReadyTasksQuery, ReadyTasksQueryVariables>;
-export const WorkflowDefinitionsDocument = new TypedDocumentString(`
-    query WorkflowDefinitions {
-  workflowDefinitions {
-    id
-    name
-    description
-    phases
-  }
-}
-    `) as unknown as TypedDocumentString<WorkflowDefinitionsQuery, WorkflowDefinitionsQueryVariables>;
+    `) as unknown as TypedDocumentString<ReadySubjectsQuery, ReadySubjectsQueryVariables>;
 export const DispatchRequirementsDocument = new TypedDocumentString(`
     query DispatchRequirements {
-  requirements {
+  subject(kind: "requirement") {
     id
     title
     description
-    priorityRaw
-    statusRaw
-    requirementType
-    tags
-    linkedTaskIds
-    acceptanceCriteria
+    status
+    priority
+    labels
+    children
   }
 }
     `) as unknown as TypedDocumentString<DispatchRequirementsQuery, DispatchRequirementsQueryVariables>;
-export const DaemonEventsDocument = new TypedDocumentString(`
-    subscription DaemonEvents($eventType: String) {
-  daemonEvents(eventType: $eventType) {
-    id
-    seq
-    timestamp
-    eventType
-    data
+export const DaemonActivityDocument = new TypedDocumentString(`
+    query DaemonActivity {
+  daemonAgents {
+    sessionId
+    provider
+    model
+    workflowId
+    phaseId
+    startedAt
   }
-}
-    `) as unknown as TypedDocumentString<DaemonEventsSubscription, DaemonEventsSubscriptionVariables>;
-export const VisionDocument = new TypedDocumentString(`
-    query Vision {
-  vision {
-    title
-    summary
-    goals
-    targetAudience
-    successCriteria
-    constraints
-    raw
-  }
-}
-    `) as unknown as TypedDocumentString<VisionQuery, VisionQueryVariables>;
-export const RequirementsDocument = new TypedDocumentString(`
-    query Requirements {
-  requirements {
-    id
-    title
-    description
-    priority
-    priorityRaw
+  daemonHealth {
+    healthy
     status
-    statusRaw
-    requirementType
-    tags
-    linkedTaskIds
-    acceptanceCriteria
+    lastError
   }
 }
-    `) as unknown as TypedDocumentString<RequirementsQuery, RequirementsQueryVariables>;
-export const RequirementDocument = new TypedDocumentString(`
-    query Requirement($id: ID!) {
-  requirement(id: $id) {
-    id
-    title
-    description
-    priority
-    priorityRaw
-    status
-    statusRaw
-    requirementType
-    tags
-    linkedTaskIds
-    acceptanceCriteria
-  }
-}
-    `) as unknown as TypedDocumentString<RequirementQuery, RequirementQueryVariables>;
-export const RequirementDetailDocument = new TypedDocumentString(`
-    query RequirementDetail($id: ID!) {
-  requirement(id: $id) {
-    id
-    title
-    description
-    priority
-    priorityRaw
-    status
-    statusRaw
-    requirementType
-    tags
-    linkedTaskIds
-    acceptanceCriteria
-  }
-}
-    `) as unknown as TypedDocumentString<RequirementDetailQuery, RequirementDetailQueryVariables>;
-export const SaveVisionDocument = new TypedDocumentString(`
-    mutation SaveVision($content: String!) {
-  saveVision(content: $content) {
-    title
-    summary
-    goals
-    targetAudience
-    successCriteria
-    constraints
-    raw
-  }
-}
-    `) as unknown as TypedDocumentString<SaveVisionMutation, SaveVisionMutationVariables>;
-export const RefineVisionDocument = new TypedDocumentString(`
-    mutation RefineVision($feedback: String) {
-  refineVision(feedback: $feedback) {
-    title
-    summary
-    goals
-    targetAudience
-    successCriteria
-    constraints
-    raw
-  }
-}
-    `) as unknown as TypedDocumentString<RefineVisionMutation, RefineVisionMutationVariables>;
-export const CreateRequirementDocument = new TypedDocumentString(`
-    mutation CreateRequirement($title: String!, $description: String, $priority: String, $requirementType: String, $acceptanceCriteria: [String!]) {
-  createRequirement(
-    title: $title
-    description: $description
-    priority: $priority
-    requirementType: $requirementType
-    acceptanceCriteria: $acceptanceCriteria
-  ) {
-    id
-  }
-}
-    `) as unknown as TypedDocumentString<CreateRequirementMutation, CreateRequirementMutationVariables>;
-export const UpdateRequirementDocument = new TypedDocumentString(`
-    mutation UpdateRequirement($id: ID!, $title: String, $description: String, $priority: String, $status: String, $requirementType: String, $acceptanceCriteria: [String!]) {
-  updateRequirement(
-    id: $id
-    title: $title
-    description: $description
-    priority: $priority
-    status: $status
-    requirementType: $requirementType
-    acceptanceCriteria: $acceptanceCriteria
-  ) {
-    id
-  }
-}
-    `) as unknown as TypedDocumentString<UpdateRequirementMutation, UpdateRequirementMutationVariables>;
-export const DeleteRequirementDocument = new TypedDocumentString(`
-    mutation DeleteRequirement($id: ID!) {
-  deleteRequirement(id: $id)
-}
-    `) as unknown as TypedDocumentString<DeleteRequirementMutation, DeleteRequirementMutationVariables>;
-export const DraftRequirementDocument = new TypedDocumentString(`
-    mutation DraftRequirement($context: String) {
-  draftRequirement(context: $context) {
-    id
-    title
-  }
-}
-    `) as unknown as TypedDocumentString<DraftRequirementMutation, DraftRequirementMutationVariables>;
-export const RefineRequirementDocument = new TypedDocumentString(`
-    mutation RefineRequirement($id: String!, $feedback: String) {
-  refineRequirement(id: $id, feedback: $feedback) {
-    id
-  }
-}
-    `) as unknown as TypedDocumentString<RefineRequirementMutation, RefineRequirementMutationVariables>;
-export const ProjectsDocument = new TypedDocumentString(`
-    query Projects {
-  projects {
-    id
-    name
-    path
-    description
-    archived
-  }
-  projectsActive {
-    id
-    name
-    path
-  }
-}
-    `) as unknown as TypedDocumentString<ProjectsQuery, ProjectsQueryVariables>;
-export const ProjectDetailDocument = new TypedDocumentString(`
-    query ProjectDetail($id: ID!) {
-  project(id: $id) {
-    id
-    name
-    path
-    description
-    type
-    techStack
-    archived
-  }
-}
-    `) as unknown as TypedDocumentString<ProjectDetailQuery, ProjectDetailQueryVariables>;
-export const CreateProjectDocument = new TypedDocumentString(`
-    mutation CreateProject($name: String!, $path: String!, $description: String, $projectType: String) {
-  createProject(
-    name: $name
-    path: $path
-    description: $description
-    projectType: $projectType
-  ) {
-    id
-    name
-  }
-}
-    `) as unknown as TypedDocumentString<CreateProjectMutation, CreateProjectMutationVariables>;
-export const UpdateProjectDocument = new TypedDocumentString(`
-    mutation UpdateProject($id: ID!, $name: String, $description: String, $projectType: String) {
-  updateProject(
-    id: $id
-    name: $name
-    description: $description
-    projectType: $projectType
-  ) {
-    id
-    name
-  }
-}
-    `) as unknown as TypedDocumentString<UpdateProjectMutation, UpdateProjectMutationVariables>;
-export const DeleteProjectDocument = new TypedDocumentString(`
-    mutation DeleteProject($id: ID!) {
-  deleteProject(id: $id)
-}
-    `) as unknown as TypedDocumentString<DeleteProjectMutation, DeleteProjectMutationVariables>;
-export const LoadProjectDocument = new TypedDocumentString(`
-    mutation LoadProject($id: ID!) {
-  loadProject(id: $id) {
-    id
-    name
-  }
-}
-    `) as unknown as TypedDocumentString<LoadProjectMutation, LoadProjectMutationVariables>;
-export const ArchiveProjectDocument = new TypedDocumentString(`
-    mutation ArchiveProject($id: ID!) {
-  archiveProject(id: $id) {
-    id
-    name
-    archived
-  }
-}
-    `) as unknown as TypedDocumentString<ArchiveProjectMutation, ArchiveProjectMutationVariables>;
+    `) as unknown as TypedDocumentString<DaemonActivityQuery, DaemonActivityQueryVariables>;
 export const QueueDocument = new TypedDocumentString(`
-    query Queue {
-  queue {
+    query Queue($state: QueueState) {
+  queue(state: $state) {
+    id
     taskId
-    title
     priority
-    status
-    waitTime
-    position
+    state
+    enqueuedAt
+    held
+    holdReason
   }
   queueStats {
-    depth
-    readyCount
-    heldCount
-    avgWait
-    throughput
+    total
+    ready
+    held
+    inFlight
+    doneRecent
+    droppedRecent
   }
 }
     `) as unknown as TypedDocumentString<QueueQuery, QueueQueryVariables>;
-export const QueueHoldDocument = new TypedDocumentString(`
-    mutation QueueHold($taskId: String!, $reason: String) {
-  queueHold(taskId: $taskId, reason: $reason)
-}
-    `) as unknown as TypedDocumentString<QueueHoldMutation, QueueHoldMutationVariables>;
-export const QueueReleaseDocument = new TypedDocumentString(`
-    mutation QueueRelease($taskId: String!) {
-  queueRelease(taskId: $taskId)
-}
-    `) as unknown as TypedDocumentString<QueueReleaseMutation, QueueReleaseMutationVariables>;
-export const QueueReorderDocument = new TypedDocumentString(`
-    mutation QueueReorder($taskIds: [String!]!) {
-  queueReorder(taskIds: $taskIds)
-}
-    `) as unknown as TypedDocumentString<QueueReorderMutation, QueueReorderMutationVariables>;
-export const ReviewHandoffDocument = new TypedDocumentString(`
-    mutation ReviewHandoff($targetRole: String!, $question: String!, $context: String) {
-  reviewHandoff(targetRole: $targetRole, question: $question, context: $context)
-}
-    `) as unknown as TypedDocumentString<ReviewHandoffMutation, ReviewHandoffMutationVariables>;
-export const SaveAgentProfileDocument = new TypedDocumentString(`
-    mutation SaveAgentProfile($name: String!, $model: String, $tool: String, $role: String) {
-  saveAgentProfile(name: $name, model: $model, tool: $tool, role: $role)
-}
-    `) as unknown as TypedDocumentString<SaveAgentProfileMutation, SaveAgentProfileMutationVariables>;
-export const WorkflowConfigDocument = new TypedDocumentString(`
-    query WorkflowConfig {
-  workflowConfig {
-    mcpServers {
-      name
-      command
-      args
-      transport
-      tools
-      env {
-        key
-        value
-      }
-    }
-    phaseCatalog {
-      id
-      label
-      description
-      category
-      tags
-    }
-    tools {
-      name
-      executable
-      supportsMcp
-      supportsWrite
-      contextWindow
-    }
-    agentProfiles {
-      name
-      description
-      role
-      mcpServers
-      skills
-      tool
-      model
-    }
-    schedules {
-      id
-      cron
-      workflowRef
-      command
-      enabled
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<WorkflowConfigQuery, WorkflowConfigQueryVariables>;
-export const TasksDocument = new TypedDocumentString(`
-    query Tasks($status: String, $search: String) {
-  tasks(status: $status, search: $search) {
+export const EnqueueDocument = new TypedDocumentString(`
+    mutation Enqueue($input: EnqueueInput!) {
+  enqueue(input: $input) {
     id
-    title
-    status
-    statusRaw
-    priority
-    priorityRaw
-    taskType
-    taskTypeRaw
-    tags
-    linkedRequirementIds
-    deadline
-  }
-  taskStats {
-    total
-    byStatus
-    byPriority
+    taskId
+    state
   }
 }
-    `) as unknown as TypedDocumentString<TasksQuery, TasksQueryVariables>;
-export const TasksPrioritizedDocument = new TypedDocumentString(`
-    query TasksPrioritized {
-  tasksPrioritized {
-    id
-    title
-    status
-    statusRaw
-    priority
-    priorityRaw
-    taskType
-    taskTypeRaw
-    tags
-  }
+    `) as unknown as TypedDocumentString<EnqueueMutation, EnqueueMutationVariables>;
+export const HoldQueueDocument = new TypedDocumentString(`
+    mutation HoldQueue($id: ID!, $reason: String) {
+  holdQueue(id: $id, reason: $reason)
 }
-    `) as unknown as TypedDocumentString<TasksPrioritizedQuery, TasksPrioritizedQueryVariables>;
-export const TaskDetailDocument = new TypedDocumentString(`
-    query TaskDetail($id: ID!) {
-  task(id: $id) {
+    `) as unknown as TypedDocumentString<HoldQueueMutation, HoldQueueMutationVariables>;
+export const ReleaseQueueDocument = new TypedDocumentString(`
+    mutation ReleaseQueue($id: ID!) {
+  releaseQueue(id: $id)
+}
+    `) as unknown as TypedDocumentString<ReleaseQueueMutation, ReleaseQueueMutationVariables>;
+export const DropQueueDocument = new TypedDocumentString(`
+    mutation DropQueue($id: ID!) {
+  dropQueue(id: $id)
+}
+    `) as unknown as TypedDocumentString<DropQueueMutation, DropQueueMutationVariables>;
+export const ReorderQueueDocument = new TypedDocumentString(`
+    mutation ReorderQueue($ids: [ID!]!, $front: Boolean) {
+  reorderQueue(ids: $ids, front: $front)
+}
+    `) as unknown as TypedDocumentString<ReorderQueueMutation, ReorderQueueMutationVariables>;
+export const SubjectsDocument = new TypedDocumentString(`
+    query Subjects($kind: String, $status: SubjectStatus) {
+  subject(kind: $kind, status: $status) {
     id
+    kind
     title
     description
     status
-    statusRaw
+    nativeStatus
     priority
-    priorityRaw
-    taskType
-    taskTypeRaw
-    risk
-    scope
-    complexity
-    tags
-    linkedRequirementIds
-    deadline
-    checklist {
-      id
-      description
-      completed
-    }
-    dependencies {
-      taskId
-      type
-    }
+    assignee
+    labels
+    parent
+    children
+    url
+    createdAt
+    updatedAt
   }
 }
-    `) as unknown as TypedDocumentString<TaskDetailQuery, TaskDetailQueryVariables>;
-export const UpdateTaskStatusDocument = new TypedDocumentString(`
-    mutation UpdateTaskStatus($id: ID!, $status: String!) {
-  updateTaskStatus(id: $id, status: $status) {
+    `) as unknown as TypedDocumentString<SubjectsQuery, SubjectsQueryVariables>;
+export const SubjectDetailDocument = new TypedDocumentString(`
+    query SubjectDetail($id: ID!) {
+  subjectById(id: $id) {
     id
+    kind
+    title
+    description
     status
-    statusRaw
+    nativeStatus
+    statusMetadata
+    priority
+    assignee
+    labels
+    parent
+    children
+    url
+    createdAt
+    updatedAt
+    custom
+    attachments {
+      id
+      kind
+      uri
+      title
+      mimeType
+      metadata
+    }
   }
 }
-    `) as unknown as TypedDocumentString<UpdateTaskStatusMutation, UpdateTaskStatusMutationVariables>;
-export const CreateTaskDocument = new TypedDocumentString(`
-    mutation CreateTask($title: String!, $description: String, $taskType: String, $priority: String) {
-  createTask(
-    title: $title
-    description: $description
-    taskType: $taskType
-    priority: $priority
-  ) {
+    `) as unknown as TypedDocumentString<SubjectDetailQuery, SubjectDetailQueryVariables>;
+export const SubjectNextDocument = new TypedDocumentString(`
+    query SubjectNext($kind: String) {
+  subjectNext(kind: $kind) {
     id
+    kind
     title
     status
-    statusRaw
+    priority
   }
 }
-    `) as unknown as TypedDocumentString<CreateTaskMutation, CreateTaskMutationVariables>;
-export const UpdateTaskDocument = new TypedDocumentString(`
-    mutation UpdateTask($id: ID!, $title: String, $description: String, $taskType: String, $priority: String, $risk: String, $scope: String, $complexity: String) {
-  updateTask(
-    id: $id
-    title: $title
-    description: $description
-    taskType: $taskType
-    priority: $priority
-    risk: $risk
-    scope: $scope
-    complexity: $complexity
-  ) {
+    `) as unknown as TypedDocumentString<SubjectNextQuery, SubjectNextQueryVariables>;
+export const CreateSubjectDocument = new TypedDocumentString(`
+    mutation CreateSubject($input: CreateSubjectInput!) {
+  createSubject(input: $input) {
     id
+    kind
     title
     status
-    statusRaw
   }
 }
-    `) as unknown as TypedDocumentString<UpdateTaskMutation, UpdateTaskMutationVariables>;
-export const DeleteTaskDocument = new TypedDocumentString(`
-    mutation DeleteTask($id: ID!) {
-  deleteTask(id: $id)
-}
-    `) as unknown as TypedDocumentString<DeleteTaskMutation, DeleteTaskMutationVariables>;
-export const SetDeadlineDocument = new TypedDocumentString(`
-    mutation SetDeadline($id: ID!, $deadline: String) {
-  setDeadline(id: $id, deadline: $deadline) {
+    `) as unknown as TypedDocumentString<CreateSubjectMutation, CreateSubjectMutationVariables>;
+export const UpdateSubjectDocument = new TypedDocumentString(`
+    mutation UpdateSubject($input: UpdateSubjectInput!) {
+  updateSubject(input: $input) {
     id
-    deadline
+    status
+    assignee
+    labels
   }
 }
-    `) as unknown as TypedDocumentString<SetDeadlineMutation, SetDeadlineMutationVariables>;
-export const AssignAgentDocument = new TypedDocumentString(`
-    mutation AssignAgent($id: ID!, $role: String, $model: String) {
-  assignAgent(id: $id, role: $role, model: $model) {
+    `) as unknown as TypedDocumentString<UpdateSubjectMutation, UpdateSubjectMutationVariables>;
+export const SetSubjectStatusDocument = new TypedDocumentString(`
+    mutation SetSubjectStatus($id: ID!, $status: SubjectStatus!) {
+  setSubjectStatus(id: $id, status: $status) {
     id
+    status
+    nativeStatus
   }
 }
-    `) as unknown as TypedDocumentString<AssignAgentMutation, AssignAgentMutationVariables>;
-export const AssignHumanDocument = new TypedDocumentString(`
-    mutation AssignHuman($id: ID!, $name: String!) {
-  assignHuman(id: $id, name: $name) {
-    id
-  }
-}
-    `) as unknown as TypedDocumentString<AssignHumanMutation, AssignHumanMutationVariables>;
-export const ChecklistAddDocument = new TypedDocumentString(`
-    mutation ChecklistAdd($id: ID!, $description: String!) {
-  checklistAdd(id: $id, description: $description) {
-    id
-    checklist {
-      id
-      description
-      completed
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<ChecklistAddMutation, ChecklistAddMutationVariables>;
-export const ChecklistUpdateDocument = new TypedDocumentString(`
-    mutation ChecklistUpdate($id: ID!, $itemId: String!, $completed: Boolean, $description: String) {
-  checklistUpdate(
-    id: $id
-    itemId: $itemId
-    completed: $completed
-    description: $description
-  ) {
-    id
-    checklist {
-      id
-      description
-      completed
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<ChecklistUpdateMutation, ChecklistUpdateMutationVariables>;
-export const DependencyAddDocument = new TypedDocumentString(`
-    mutation DependencyAdd($id: ID!, $dependsOn: String!, $dependencyType: String) {
-  dependencyAdd(id: $id, dependsOn: $dependsOn, dependencyType: $dependencyType) {
-    id
-    dependencies {
-      taskId
-      type
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<DependencyAddMutation, DependencyAddMutationVariables>;
-export const DependencyRemoveDocument = new TypedDocumentString(`
-    mutation DependencyRemove($id: ID!, $dependsOn: String!) {
-  dependencyRemove(id: $id, dependsOn: $dependsOn) {
-    id
-    dependencies {
-      taskId
-      type
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<DependencyRemoveMutation, DependencyRemoveMutationVariables>;
+    `) as unknown as TypedDocumentString<SetSubjectStatusMutation, SetSubjectStatusMutationVariables>;
 export const WorkflowsDocument = new TypedDocumentString(`
-    query Workflows($status: String) {
+    query Workflows($status: WorkflowStatus) {
   workflows(status: $status) {
     id
-    taskId
-    workflowRef
+    definition
     status
-    statusRaw
-    currentPhase
-    totalReworks
-    phases {
-      phaseId
-      status
-      startedAt
-      completedAt
-      attempt
-      errorMessage
-    }
+    subjectId
+    startedAt
+    finishedAt
   }
 }
     `) as unknown as TypedDocumentString<WorkflowsQuery, WorkflowsQueryVariables>;
@@ -2042,91 +993,45 @@ export const WorkflowDetailDocument = new TypedDocumentString(`
     query WorkflowDetail($id: ID!) {
   workflow(id: $id) {
     id
-    taskId
-    workflowRef
+    definition
     status
-    statusRaw
-    currentPhase
-    totalReworks
-    phases {
-      phaseId
-      status
-      startedAt
-      completedAt
-      attempt
-      errorMessage
-    }
-    decisions {
-      timestamp
-      phaseId
-      source
-      decision
-      targetPhase
-      reason
-      confidence
-      risk
-    }
-  }
-  workflowCheckpoints(workflowId: $id) {
-    id
-    phase
-    timestamp
-    data
+    subjectId
+    startedAt
+    finishedAt
+    detail
   }
 }
     `) as unknown as TypedDocumentString<WorkflowDetailQuery, WorkflowDetailQueryVariables>;
 export const RunWorkflowDocument = new TypedDocumentString(`
-    mutation RunWorkflow($taskId: String!, $workflowRef: String) {
-  runWorkflow(taskId: $taskId, workflowRef: $workflowRef) {
-    id
-    taskId
+    mutation RunWorkflow($taskId: ID!, $definition: String) {
+  runWorkflow(taskId: $taskId, definition: $definition) {
+    workflowId
     status
-    statusRaw
+    startedAt
   }
 }
     `) as unknown as TypedDocumentString<RunWorkflowMutation, RunWorkflowMutationVariables>;
+export const ExecuteWorkflowDocument = new TypedDocumentString(`
+    mutation ExecuteWorkflow($definition: String!, $subjectId: ID) {
+  executeWorkflow(definition: $definition, subjectId: $subjectId) {
+    workflowId
+    status
+    startedAt
+  }
+}
+    `) as unknown as TypedDocumentString<ExecuteWorkflowMutation, ExecuteWorkflowMutationVariables>;
 export const PauseWorkflowDocument = new TypedDocumentString(`
     mutation PauseWorkflow($id: ID!) {
-  pauseWorkflow(id: $id) {
-    id
-    status
-  }
+  pauseWorkflow(id: $id)
 }
     `) as unknown as TypedDocumentString<PauseWorkflowMutation, PauseWorkflowMutationVariables>;
 export const ResumeWorkflowDocument = new TypedDocumentString(`
     mutation ResumeWorkflow($id: ID!, $feedback: String) {
-  resumeWorkflow(id: $id, feedback: $feedback) {
-    id
-    status
-  }
+  resumeWorkflow(id: $id, feedback: $feedback)
 }
     `) as unknown as TypedDocumentString<ResumeWorkflowMutation, ResumeWorkflowMutationVariables>;
 export const CancelWorkflowDocument = new TypedDocumentString(`
-    mutation CancelWorkflow($id: ID!) {
-  cancelWorkflow(id: $id) {
-    id
-    status
-  }
+    mutation CancelWorkflow($id: ID!, $reason: String) {
+  cancelWorkflow(id: $id, reason: $reason)
 }
     `) as unknown as TypedDocumentString<CancelWorkflowMutation, CancelWorkflowMutationVariables>;
-export const ApprovePhaseDocument = new TypedDocumentString(`
-    mutation ApprovePhase($workflowId: ID!, $phaseId: String!, $note: String) {
-  approvePhase(workflowId: $workflowId, phaseId: $phaseId, note: $note) {
-    id
-    status
-    statusRaw
-    currentPhase
-  }
-}
-    `) as unknown as TypedDocumentString<ApprovePhaseMutation, ApprovePhaseMutationVariables>;
-export const WorkflowEventsDocument = new TypedDocumentString(`
-    subscription WorkflowEvents($workflowId: String) {
-  workflowEvents(workflowId: $workflowId) {
-    id
-    seq
-    timestamp
-    eventType
-    data
-  }
-}
-    `) as unknown as TypedDocumentString<WorkflowEventsSubscription, WorkflowEventsSubscriptionVariables>;

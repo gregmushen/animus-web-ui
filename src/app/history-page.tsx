@@ -4,11 +4,8 @@ import { useQuery } from "@/lib/graphql/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DaemonDocument,
-  WorkflowsDocument,
-  GqlWorkflowStatus,
-} from "@/lib/graphql/generated/graphql";
+import { WorkflowsDocument, WorkflowStatus } from "@/lib/graphql/generated/graphql";
+import type { WorkflowsQuery } from "@/lib/graphql/generated/graphql";
 import { statusColor, PageLoading, PageError } from "./shared";
 
 type TimeRange = "24h" | "7d" | "30d" | "all";
@@ -17,11 +14,10 @@ type StatusFilter = "all" | "completed" | "failed" | "running";
 type HistoryEntry = {
   id: string;
   timestamp: string;
-  type: "workflow" | "daemon";
-  status: string;
+  status: WorkflowStatus;
   description: string;
-  workflowId?: string;
-  taskId?: string;
+  workflowId: string;
+  subjectId?: string | null;
 };
 
 const PAGE_SIZE = 10;
@@ -44,56 +40,38 @@ function formatTimestamp(ts: string): string {
   });
 }
 
-function workflowStatusToFilter(status: GqlWorkflowStatus): StatusFilter {
-  if (status === GqlWorkflowStatus.Completed) return "completed";
-  if (status === GqlWorkflowStatus.Failed || status === GqlWorkflowStatus.Cancelled) return "failed";
-  if (status === GqlWorkflowStatus.Running) return "running";
+function workflowStatusToFilter(status: WorkflowStatus): StatusFilter {
+  if (status === WorkflowStatus.Completed) return "completed";
+  if (status === WorkflowStatus.Failed || status === WorkflowStatus.Cancelled) return "failed";
+  if (status === WorkflowStatus.Running) return "running";
   return "all";
 }
 
 export function HistoryPage() {
-  const [daemonResult] = useQuery({ query: DaemonDocument });
-  const [workflowResult] = useQuery({ query: WorkflowsDocument, variables: {} });
+  const [workflowResult] = useQuery<WorkflowsQuery>({ query: WorkflowsDocument, variables: {} });
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(0);
 
-  const fetching = daemonResult.fetching || workflowResult.fetching;
-  const error = daemonResult.error || workflowResult.error;
+  const fetching = workflowResult.fetching;
+  const error = workflowResult.error;
 
   const entries = useMemo<HistoryEntry[]>(() => {
     const items: HistoryEntry[] = [];
     const cutoff = timeRange === "all" ? 0 : Date.now() - timeMs(timeRange);
 
-    const logs = daemonResult.data?.daemonLogs ?? [];
-    for (const log of logs) {
-      const ts = log.timestamp ?? "";
-      if (new Date(ts).getTime() < cutoff) continue;
-      items.push({
-        id: `daemon-${ts}-${log.message?.slice(0, 20)}`,
-        timestamp: ts,
-        type: "daemon",
-        status: log.level ?? "INFO",
-        description: log.message ?? "",
-      });
-    }
-
     const workflows = workflowResult.data?.workflows ?? [];
     for (const wf of workflows) {
-      const lastPhase = wf.phases.length > 0
-        ? wf.phases.reduce((a, b) => ((b.completedAt ?? b.startedAt ?? "") > (a.completedAt ?? a.startedAt ?? "") ? b : a))
-        : null;
-      const ts = lastPhase?.completedAt ?? lastPhase?.startedAt ?? "";
+      const ts = wf.finishedAt ?? wf.startedAt ?? "";
       if (ts && new Date(ts).getTime() < cutoff) continue;
 
       items.push({
         id: `wf-${wf.id}`,
         timestamp: ts,
-        type: "workflow",
-        status: wf.statusRaw ?? wf.status,
-        description: `Workflow ${wf.id}${wf.currentPhase ? ` — phase ${wf.currentPhase}` : ""}`,
+        status: wf.status,
+        description: `${wf.definition} — ${wf.id}`,
         workflowId: wf.id,
-        taskId: wf.taskId,
+        subjectId: wf.subjectId,
       });
     }
 
@@ -104,18 +82,11 @@ export function HistoryPage() {
     });
 
     return items;
-  }, [daemonResult.data, workflowResult.data, timeRange]);
+  }, [workflowResult.data, timeRange]);
 
   const filtered = useMemo(() => {
     if (statusFilter === "all") return entries;
-    return entries.filter((e) => {
-      if (e.type === "workflow") {
-        const wfStatus = workflowStatusToFilter(e.status as GqlWorkflowStatus);
-        return wfStatus === statusFilter;
-      }
-      if (statusFilter === "failed") return e.status === "ERROR";
-      return false;
-    });
+    return entries.filter((e) => workflowStatusToFilter(e.status) === statusFilter);
   }, [entries, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -129,7 +100,7 @@ export function HistoryPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
         <p className="text-sm text-muted-foreground/60 mt-1">
-          Execution history and past agent runs
+          Workflow execution history
         </p>
       </div>
 
@@ -191,14 +162,8 @@ export function HistoryPage() {
                 <Card className="border-border/40 bg-card/60 ml-1">
                   <CardContent className="pt-3 pb-3 px-4 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant={entry.type === "workflow" ? statusColor(entry.status) : entry.status === "ERROR" ? "destructive" : "outline"}
-                        className="text-[10px] shrink-0"
-                      >
-                        {entry.type === "workflow" ? entry.status : entry.status}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px] shrink-0 font-mono border-border/30 text-muted-foreground/60">
-                        {entry.type}
+                      <Badge variant={statusColor(entry.status.toLowerCase())} className="text-[10px] shrink-0">
+                        {entry.status}
                       </Badge>
                       <span className="text-[10px] font-mono text-muted-foreground/40 ml-auto shrink-0">
                         {formatTimestamp(entry.timestamp)}
@@ -207,26 +172,22 @@ export function HistoryPage() {
 
                     <p className="text-sm text-foreground/80">{entry.description}</p>
 
-                    {(entry.workflowId || entry.taskId) && (
-                      <div className="flex items-center gap-3 text-[11px]">
-                        {entry.workflowId && (
-                          <Link
-                            to={`/workflows/${entry.workflowId}`}
-                            className="text-primary/80 hover:text-primary transition-colors"
-                          >
-                            {entry.workflowId}
-                          </Link>
-                        )}
-                        {entry.taskId && (
-                          <Link
-                            to={`/tasks/${entry.taskId}`}
-                            className="text-primary/80 hover:text-primary transition-colors"
-                          >
-                            {entry.taskId}
-                          </Link>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <Link
+                        to={`/workflows/${entry.workflowId}`}
+                        className="text-primary/80 hover:text-primary transition-colors"
+                      >
+                        {entry.workflowId}
+                      </Link>
+                      {entry.subjectId && (
+                        <Link
+                          to={`/tasks/${entry.subjectId}`}
+                          className="text-primary/80 hover:text-primary transition-colors"
+                        >
+                          {entry.subjectId}
+                        </Link>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>

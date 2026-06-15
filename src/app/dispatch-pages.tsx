@@ -8,60 +8,45 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  ReadyTasksDocument,
-  WorkflowDefinitionsDocument,
+  ReadySubjectsDocument,
   DaemonDocument,
   RunWorkflowDocument,
   DispatchRequirementsDocument,
+  ExecuteWorkflowDocument,
+} from "@/lib/graphql/generated/graphql";
+import type {
+  ReadySubjectsQuery,
+  DaemonQuery,
+  DispatchRequirementsQuery,
 } from "@/lib/graphql/generated/graphql";
 import { statusColor, priorityColor, PageLoading, PageError } from "./shared";
 
+const PRIORITY_LABELS = ["none", "low", "medium", "high", "critical"];
 
-function WorkflowTypeSelector({
+function priorityLabel(p: number | null | undefined): string {
+  return PRIORITY_LABELS[p ?? 0] ?? "none";
+}
+
+// TODO(E-followup): richer rendering — replace free-text workflow definition
+// name with a catalog of installed workflow definitions when a backend query exists.
+function WorkflowDefinitionInput({
   value,
   onChange,
-  definitions,
 }: {
   value: string;
   onChange: (v: string) => void;
-  definitions: Array<{ id: string; name: string; description?: string | null; phases: string[] }>;
 }) {
-  const selected = definitions.find((d) => d.id === value);
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label="Workflow type">
-        {definitions.map((def) => (
-          <button
-            key={def.id}
-            type="button"
-            role="radio"
-            aria-checked={value === def.id}
-            onClick={() => onChange(def.id)}
-            className={`rounded-md border px-4 py-2 text-sm transition-all duration-150 ${
-              value === def.id
-                ? "border-primary/30 bg-primary/5 text-primary"
-                : "border-border/40 text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            }`}
-          >
-            {def.name}
-          </button>
-        ))}
-      </div>
-      {selected && selected.description && (
-        <p className="text-xs text-muted-foreground/70">{selected.description}</p>
-      )}
-      {selected && selected.phases.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {selected.phases.map((phase) => (
-            <span
-              key={phase}
-              className="rounded-full bg-muted/40 px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground"
-            >
-              {phase}
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="space-y-2">
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="default workflow (leave empty)"
+        aria-label="Workflow definition name"
+      />
+      <p className="text-xs text-muted-foreground/70">
+        Workflow definition name. Leave empty to use the default workflow.
+      </p>
     </div>
   );
 }
@@ -95,94 +80,63 @@ function PreflightCheck({ check, index }: { check: { label: string; passed: bool
   );
 }
 
-function ComingSoonNotice({ command }: { command: string }) {
-  return (
-    <div className="rounded-md border border-border/40 bg-card/60 px-4 py-3">
-      <p className="text-xs text-muted-foreground">
-        Coming soon &mdash; use <code className="font-mono text-[11px] bg-muted/40 px-1 py-0.5 rounded">{command}</code> via CLI
-      </p>
-    </div>
-  );
-}
-
 export function TaskDispatchPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [workflowType, setWorkflowType] = useState<string>("standard");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [model, setModel] = useState("auto");
-  const [tool, setTool] = useState("auto");
-  const [maxReworks, setMaxReworks] = useState(3);
-  const [phaseTimeout, setPhaseTimeout] = useState("");
-  const [skipPhases, setSkipPhases] = useState("");
-  const [vars, setVars] = useState("");
+  const [definition, setDefinition] = useState("");
   const [launching, setLaunching] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [readyResult] = useQuery({ query: ReadyTasksDocument, variables: { search: search.trim() || null, limit: 50 } });
-  const [defsResult] = useQuery({ query: WorkflowDefinitionsDocument });
-  const [daemonResult] = useQuery({ query: DaemonDocument });
+  const [readyResult] = useQuery<ReadySubjectsQuery>({ query: ReadySubjectsDocument, variables: { kind: "task" } });
+  const [daemonResult] = useQuery<DaemonQuery>({ query: DaemonDocument });
   const [, runWorkflow] = useMutation(RunWorkflowDocument);
 
-  const tasks = readyResult.data?.readyTasks ?? [];
-  const definitions = defsResult.data?.workflowDefinitions ?? [];
-  const daemonStatus = daemonResult.data?.daemonStatus;
+  const allTasks = readyResult.data?.subject ?? [];
+  const daemon = daemonResult.data?.daemon;
   const daemonHealth = daemonResult.data?.daemonHealth;
 
+  const tasks = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allTasks;
+    return allTasks.filter(
+      (t) => t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q)
+    );
+  }, [allTasks, search]);
+
   const selectedTask = useMemo(
-    () => tasks.find((t) => t.id === selectedTaskId) ?? null,
-    [tasks, selectedTaskId]
+    () => allTasks.find((t) => t.id === selectedTaskId) ?? null,
+    [allTasks, selectedTaskId]
   );
-
-  const selectedDef = useMemo(
-    () => definitions.find((d) => d.id === workflowType),
-    [definitions, workflowType]
-  );
-
-  useMemo(() => {
-    if (definitions.length > 0 && !definitions.find((d) => d.id === workflowType)) {
-      setWorkflowType(definitions[0].id);
-    }
-  }, [definitions, workflowType]);
 
   const preflightChecks = useMemo(() => {
     const checks: { label: string; passed: boolean; fix?: string }[] = [];
 
-    const daemonRunning = daemonStatus?.statusRaw === "running";
+    const daemonRunning = daemon?.running === true;
     checks.push({
       label: "Daemon is running",
       passed: daemonRunning,
-      fix: daemonRunning ? undefined : "Start the daemon from the Daemon page or run `ao daemon start`",
+      fix: daemonRunning ? undefined : "Start the daemon from the Daemon page or run `animus daemon start`",
     });
 
-    const runnerOk = daemonHealth?.runnerConnected === true;
+    const healthy = daemonHealth?.healthy === true;
     checks.push({
-      label: "Runner is connected",
-      passed: runnerOk,
-      fix: runnerOk ? undefined : "Check runner health via `ao runner health`",
-    });
-
-    const maxAgents = daemonStatus?.maxAgents ?? 0;
-    const activeAgents = daemonStatus?.activeAgents ?? 0;
-    const hasCapacity = maxAgents === 0 || activeAgents < maxAgents;
-    checks.push({
-      label: "Agent capacity available",
-      passed: hasCapacity,
-      fix: hasCapacity ? undefined : `All ${maxAgents} agent slots in use. Wait for a slot or increase max agents.`,
+      label: "Daemon is healthy",
+      passed: healthy,
+      fix: healthy ? undefined : "Check daemon health via `animus daemon health`",
     });
 
     if (selectedTask) {
-      const validStatus = ["ready", "backlog"].includes(selectedTask.statusRaw ?? "");
+      const validStatus = selectedTask.status === "READY";
       checks.push({
-        label: `Task status is dispatchable (${selectedTask.statusRaw})`,
+        label: `Task status is dispatchable (${selectedTask.status})`,
         passed: validStatus,
-        fix: validStatus ? undefined : "Set task status to 'ready' or 'backlog' before dispatching",
+        fix: validStatus ? undefined : "Set task status to 'ready' before dispatching",
       });
     }
 
     return checks;
-  }, [daemonStatus, daemonHealth, selectedTask]);
+  }, [daemon, daemonHealth, selectedTask]);
 
   const allPassed = selectedTask !== null && preflightChecks.every((c) => c.passed);
 
@@ -191,33 +145,19 @@ export function TaskDispatchPage() {
     setLaunching(true);
     setErrorMsg(null);
 
-    const workflowRef = selectedDef && selectedDef.id !== "standard" ? selectedDef.id : null;
-    const resolvedModel = model !== "auto" ? model : null;
-    const resolvedTool = tool !== "auto" ? tool : null;
-    const resolvedTimeout = phaseTimeout ? parseInt(phaseTimeout, 10) : null;
-    const resolvedSkipPhases = skipPhases.trim()
-      ? skipPhases.split(",").map((s) => s.trim()).filter(Boolean)
-      : null;
-    const resolvedVars = vars.trim() || null;
-
     const { data, error } = await runWorkflow({
       taskId: selectedTaskId,
-      workflowRef,
-      model: resolvedModel,
-      tool: resolvedTool,
-      vars: resolvedVars,
-      skipPhases: resolvedSkipPhases,
-      phaseTimeoutSecs: resolvedTimeout,
+      definition: definition.trim() || null,
     });
     setLaunching(false);
     if (error) {
       setErrorMsg(error.message);
-    } else if (data?.runWorkflow?.id) {
-      navigate(`/workflows/${data.runWorkflow.id}`);
+    } else if (data?.runWorkflow?.workflowId) {
+      navigate(`/workflows/${data.runWorkflow.workflowId}`);
     }
   };
 
-  if (readyResult.fetching || daemonResult.fetching || defsResult.fetching) return <PageLoading />;
+  if (readyResult.fetching || daemonResult.fetching) return <PageLoading />;
   if (readyResult.error) return <PageError message={readyResult.error.message} />;
 
   return (
@@ -259,8 +199,8 @@ export function TaskDispatchPage() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="font-mono text-xs text-muted-foreground shrink-0">{t.id}</span>
                     <span className="text-sm flex-1 truncate min-w-0">{t.title}</span>
-                    <Badge variant={priorityColor(t.priorityRaw ?? "")} className="text-[10px]">{t.priorityRaw}</Badge>
-                    <Badge variant={statusColor(t.statusRaw ?? "")} className="text-[10px]">{t.statusRaw}</Badge>
+                    <Badge variant={priorityColor(priorityLabel(t.priority))} className="text-[10px]">{priorityLabel(t.priority)}</Badge>
+                    <Badge variant={statusColor(t.status.toLowerCase())} className="text-[10px]">{t.status}</Badge>
                   </div>
                 </button>
               ))
@@ -274,106 +214,9 @@ export function TaskDispatchPage() {
           <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Workflow Type</CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4">
-          {definitions.length > 0 ? (
-            <WorkflowTypeSelector value={workflowType} onChange={setWorkflowType} definitions={definitions} />
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">No workflow definitions available.</p>
-          )}
+          <WorkflowDefinitionInput value={definition} onChange={setDefinition} />
         </CardContent>
       </Card>
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          aria-expanded={showAdvanced}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <span className={`inline-block transition-transform duration-150 ${showAdvanced ? "rotate-90" : ""}`}>&#9656;</span>
-          {showAdvanced ? "Hide advanced" : "Show advanced"}
-        </button>
-        {showAdvanced && (
-          <Card className="border-border/40 bg-card/60 mt-2 ao-fade-in">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Model</label>
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="auto">Auto (default)</option>
-                    <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                    <option value="claude-opus-4-6">claude-opus-4-6</option>
-                    <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Tool</label>
-                  <select
-                    value={tool}
-                    onChange={(e) => setTool(e.target.value)}
-                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="auto">Auto (default)</option>
-                    <option value="claude">claude</option>
-                    <option value="codex">codex</option>
-                    <option value="gemini">gemini</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Max Reworks</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={10}
-                    value={maxReworks}
-                    onChange={(e) => setMaxReworks(Number(e.target.value))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Phase Timeout (s)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={phaseTimeout}
-                    onChange={(e) => setPhaseTimeout(e.target.value)}
-                    placeholder="default"
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Skip Phases</label>
-                  <Input
-                    value={skipPhases}
-                    onChange={(e) => setSkipPhases(e.target.value)}
-                    placeholder="phase1, phase2"
-                    className="mt-1"
-                  />
-                  <p className="text-[10px] text-muted-foreground/50 mt-1">Comma-separated phase IDs to skip</p>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Variables (JSON)</label>
-                  <Input
-                    value={vars}
-                    onChange={(e) => setVars(e.target.value)}
-                    placeholder='{"key": "value"}'
-                    className="mt-1"
-                  />
-                  <p className="text-[10px] text-muted-foreground/50 mt-1">JSON string passed as workflow variables</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {selectedTask && (
         <Card className="border-border/40 bg-card/60 ao-fade-in">
@@ -407,30 +250,16 @@ export function TaskDispatchPage() {
 }
 
 export function RequirementDispatchPage() {
-  const [{ data, fetching, error }] = useQuery({ query: DispatchRequirementsDocument });
-  const [defsResult] = useQuery({ query: WorkflowDefinitionsDocument });
+  const [{ data, fetching, error }] = useQuery<DispatchRequirementsQuery>({ query: DispatchRequirementsDocument });
   const [, runWorkflow] = useMutation(RunWorkflowDocument);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [autoStart, setAutoStart] = useState(true);
-  const [includeWont, setIncludeWont] = useState(false);
-  const [workflowType, setWorkflowType] = useState<string>("standard");
+  const [definition, setDefinition] = useState("");
   const [executing, setExecuting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [results, setResults] = useState<{ dispatched: number; errors: string[] } | null>(null);
 
-  const definitions = defsResult.data?.workflowDefinitions ?? [];
-
-  useMemo(() => {
-    if (definitions.length > 0 && !definitions.find((d) => d.id === workflowType)) {
-      setWorkflowType(definitions[0].id);
-    }
-  }, [definitions, workflowType]);
-
-  const requirements = useMemo(() => {
-    const list = data?.requirements ?? [];
-    if (includeWont) return list;
-    return list.filter((r) => r.priorityRaw !== "wont");
-  }, [data, includeWont]);
+  const requirements = data?.subject ?? [];
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -444,21 +273,12 @@ export function RequirementDispatchPage() {
     setSelectedIds(new Set(requirements.map((r) => r.id)));
   };
 
-  const selectMust = () => {
-    setSelectedIds(new Set(requirements.filter((r) => r.priorityRaw === "must").map((r) => r.id)));
-  };
-
-  const selectedDef = useMemo(
-    () => definitions.find((d) => d.id === workflowType),
-    [definitions, workflowType]
-  );
-
   const onExecute = async () => {
     const selected = requirements.filter((r) => selectedIds.has(r.id));
     const taskIds = new Set<string>();
     for (const req of selected) {
-      for (const tid of req.linkedTaskIds) {
-        taskIds.add(tid);
+      for (const childId of req.children) {
+        taskIds.add(childId);
       }
     }
 
@@ -471,12 +291,12 @@ export function RequirementDispatchPage() {
     setErrorMsg(null);
     setResults(null);
 
-    const workflowRef = selectedDef && selectedDef.id !== "standard" ? selectedDef.id : null;
+    const resolvedDefinition = definition.trim() || null;
     const errors: string[] = [];
     let dispatched = 0;
 
     for (const taskId of taskIds) {
-      const { error: err } = await runWorkflow({ taskId, workflowRef });
+      const { error: err } = await runWorkflow({ taskId, definition: resolvedDefinition });
       if (err) {
         errors.push(`${taskId}: ${err.message}`);
       } else {
@@ -488,7 +308,7 @@ export function RequirementDispatchPage() {
     setResults({ dispatched, errors });
   };
 
-  if (fetching || defsResult.fetching) return <PageLoading />;
+  if (fetching) return <PageLoading />;
   if (error) return <PageError message={error.message} />;
 
   return (
@@ -496,7 +316,7 @@ export function RequirementDispatchPage() {
       <BackLink />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Execute Requirements</h1>
-        <p className="text-sm text-muted-foreground mt-1">Generate tasks and dispatch workflows from requirements</p>
+        <p className="text-sm text-muted-foreground mt-1">Dispatch workflows for tasks linked to requirements</p>
       </div>
 
       <Card className="border-border/40 bg-card/60">
@@ -505,7 +325,6 @@ export function RequirementDispatchPage() {
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Requirements</CardTitle>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="h-6 text-xs" onClick={selectAll}>Select All</Button>
-              <Button size="sm" variant="outline" className="h-6 text-xs" onClick={selectMust}>Select Must</Button>
             </div>
           </div>
         </CardHeader>
@@ -531,10 +350,10 @@ export function RequirementDispatchPage() {
                   />
                   <span className="font-mono text-xs text-muted-foreground shrink-0">{req.id}</span>
                   <span className="text-sm flex-1 truncate min-w-0">{req.title}</span>
-                  <Badge variant={req.priorityRaw === "must" ? "destructive" : req.priorityRaw === "should" ? "default" : "secondary"} className="text-[10px]">
-                    {req.priorityRaw}
+                  <Badge variant={priorityColor(priorityLabel(req.priority))} className="text-[10px]">
+                    {priorityLabel(req.priority)}
                   </Badge>
-                  <Badge variant="outline" className="text-[10px]">{req.statusRaw}</Badge>
+                  <Badge variant={statusColor(req.status.toLowerCase())} className="text-[10px]">{req.status}</Badge>
                 </label>
               ))}
             </div>
@@ -554,24 +373,11 @@ export function RequirementDispatchPage() {
               onChange={(e) => setAutoStart(e.target.checked)}
               className="h-4 w-4"
             />
-            <span className="text-sm">Auto-start workflows after task creation</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeWont}
-              onChange={(e) => setIncludeWont(e.target.checked)}
-              className="h-4 w-4"
-            />
-            <span className="text-sm">Include won't-fix requirements</span>
+            <span className="text-sm">Auto-start workflows for linked tasks</span>
           </label>
           <div>
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-2">Workflow Type</p>
-            {definitions.length > 0 ? (
-              <WorkflowTypeSelector value={workflowType} onChange={setWorkflowType} definitions={definitions} />
-            ) : (
-              <p className="text-sm text-muted-foreground">Loading workflow definitions...</p>
-            )}
+            <WorkflowDefinitionInput value={definition} onChange={setDefinition} />
           </div>
         </CardContent>
       </Card>
@@ -583,9 +389,8 @@ export function RequirementDispatchPage() {
         <CardContent className="px-4 pb-4">
           <div className="space-y-1 text-sm">
             <p><span className="font-mono font-semibold">{selectedIds.size}</span> requirements selected</p>
-            <p>Estimated tasks: <span className="font-mono font-semibold">{selectedIds.size}</span></p>
             {autoStart && selectedIds.size > 0 && (
-              <p className="text-muted-foreground">Will dispatch up to <span className="font-mono font-semibold">{selectedIds.size}</span> workflows</p>
+              <p className="text-muted-foreground">Will dispatch workflows for all linked tasks</p>
             )}
           </div>
         </CardContent>
@@ -625,18 +430,30 @@ export function RequirementDispatchPage() {
 }
 
 export function CustomDispatchPage() {
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [workflowType, setWorkflowType] = useState<string>("standard");
-  const [defsResult] = useQuery({ query: WorkflowDefinitionsDocument });
+  const [definition, setDefinition] = useState("");
+  const [launching, setLaunching] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [, executeWorkflow] = useMutation(ExecuteWorkflowDocument);
 
-  const definitions = defsResult.data?.workflowDefinitions ?? [];
+  const onLaunch = async () => {
+    if (!definition.trim()) return;
+    setLaunching(true);
+    setErrorMsg(null);
 
-  useMemo(() => {
-    if (definitions.length > 0 && !definitions.find((d) => d.id === workflowType)) {
-      setWorkflowType(definitions[0].id);
+    const { data, error } = await executeWorkflow({
+      definition: definition.trim(),
+      subjectId: null,
+    });
+    setLaunching(false);
+    if (error) {
+      setErrorMsg(error.message);
+    } else if (data?.executeWorkflow?.workflowId) {
+      navigate(`/workflows/${data.executeWorkflow.workflowId}`);
     }
-  }, [definitions, workflowType]);
+  };
 
   return (
     <div className="space-y-6 ao-fade-in">
@@ -656,37 +473,45 @@ export function CustomDispatchPage() {
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Workflow title..."
+              placeholder="Workflow title (informational)..."
               className="mt-1"
             />
           </div>
           <div>
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Description</label>
             <Textarea
-              rows={4}
+              rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what this workflow should accomplish..."
+              placeholder="Describe what this workflow should accomplish (informational)..."
               className="mt-1"
             />
           </div>
           <div>
-            <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Workflow Type</label>
-            <div className="mt-2">
-              {definitions.length > 0 ? (
-                <WorkflowTypeSelector value={workflowType} onChange={setWorkflowType} definitions={definitions} />
-              ) : (
-                <p className="text-sm text-muted-foreground">Loading workflow definitions...</p>
-              )}
-            </div>
+            {/* TODO(E-followup): richer rendering — accept either a workflow definition name or inline YAML */}
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Definition</label>
+            <Textarea
+              rows={6}
+              value={definition}
+              onChange={(e) => setDefinition(e.target.value)}
+              placeholder="Workflow definition name or inline YAML..."
+              className="mt-1 font-mono text-xs"
+              aria-label="Workflow definition"
+            />
+            <p className="text-[10px] text-muted-foreground/50 mt-1">Required. Workflow definition name or inline YAML.</p>
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
-        <Button disabled>Launch Custom Workflow</Button>
-        <ComingSoonNotice command="custom dispatch is not yet available via the GraphQL API" />
-      </div>
+      {errorMsg && (
+        <Alert variant="destructive" className="ao-fade-in border-destructive/30 bg-destructive/8">
+          <AlertDescription>{errorMsg}</AlertDescription>
+        </Alert>
+      )}
+
+      <Button onClick={onLaunch} disabled={!definition.trim() || launching}>
+        {launching ? "Launching..." : "Launch Custom Workflow"}
+      </Button>
     </div>
   );
 }

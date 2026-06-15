@@ -15,18 +15,24 @@ import {
 } from "@/components/ui/table";
 import {
   QueueDocument,
-  QueueHoldDocument,
-  QueueReleaseDocument,
-  QueueReorderDocument,
+  HoldQueueDocument,
+  ReleaseQueueDocument,
+  ReorderQueueDocument,
 } from "@/lib/graphql/generated/graphql";
-import { statusColor, priorityColor, StatusDot, PageLoading, PageError, StatCard } from "./shared";
+import type { QueueQuery } from "@/lib/graphql/generated/graphql";
+import { priorityColor, StatusDot, PageLoading, PageError, StatCard } from "./shared";
 import { ArrowUp, ArrowDown, Pause, Play, ArrowUpDown, RefreshCw, Layers, GripVertical } from "lucide-react";
 
+const PRIORITY_LABELS = ["none", "low", "medium", "high", "critical"];
+function priorityLabel(p: number | null | undefined): string {
+  return PRIORITY_LABELS[p ?? 2] ?? "medium";
+}
+
 export function QueuePage() {
-  const [result, reexecute] = useQuery({ query: QueueDocument });
-  const [, holdMut] = useMutation(QueueHoldDocument);
-  const [, releaseMut] = useMutation(QueueReleaseDocument);
-  const [, reorderMut] = useMutation(QueueReorderDocument);
+  const [result, reexecute] = useQuery<QueueQuery>({ query: QueueDocument });
+  const [, holdMut] = useMutation(HoldQueueDocument);
+  const [, releaseMut] = useMutation(ReleaseQueueDocument);
+  const [, reorderMut] = useMutation(ReorderQueueDocument);
   const { data, fetching, error } = result;
   const dragSrcIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -37,13 +43,11 @@ export function QueuePage() {
   const entries = data?.queue ?? [];
   const stats = data?.queueStats;
 
-  const heldCount = stats?.heldCount ?? 0;
-  const readyCount = stats?.readyCount ?? 0;
-  const isHeld = (status: string | null | undefined) =>
-    status?.toLowerCase() === "held" || status?.toLowerCase() === "on-hold";
+  const heldCount = stats?.held ?? 0;
+  const readyCount = stats?.ready ?? 0;
 
-  const onHold = async (taskId: string) => {
-    const { error: err } = await holdMut({ taskId });
+  const onHold = async (id: string, taskId: string) => {
+    const { error: err } = await holdMut({ id });
     if (err) toast.error(err.message);
     else {
       toast.success(`Held ${taskId}.`);
@@ -51,8 +55,8 @@ export function QueuePage() {
     }
   };
 
-  const onRelease = async (taskId: string) => {
-    const { error: err } = await releaseMut({ taskId });
+  const onRelease = async (id: string, taskId: string) => {
+    const { error: err } = await releaseMut({ id });
     if (err) toast.error(err.message);
     else {
       toast.success(`Released ${taskId}.`);
@@ -60,18 +64,17 @@ export function QueuePage() {
     }
   };
 
-  const reorderEntries = async (ids: string[]) => {
-    const { error: err } = await reorderMut({ taskIds: ids });
+  // reorderQueue moves the given ids as a contiguous group to the front.
+  const moveToFront = async (id: string) => {
+    const { error: err } = await reorderMut({ ids: [id], front: true });
     if (err) toast.error(err.message);
     else reexecute({ requestPolicy: "network-only" });
   };
 
-  const moveEntry = async (index: number, direction: -1 | 1) => {
-    const ids = entries.map((e) => e.taskId);
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= ids.length) return;
-    [ids[index], ids[newIndex]] = [ids[newIndex], ids[index]];
-    await reorderEntries(ids);
+  const moveToBack = async (id: string) => {
+    const { error: err } = await reorderMut({ ids: [id], front: false });
+    if (err) toast.error(err.message);
+    else reexecute({ requestPolicy: "network-only" });
   };
 
   const onDragStart = (index: number) => {
@@ -88,10 +91,11 @@ export function QueuePage() {
     dragSrcIndex.current = null;
     setDragOverIndex(null);
     if (srcIndex === null || srcIndex === targetIndex) return;
-    const ids = entries.map((e) => e.taskId);
-    const [moved] = ids.splice(srcIndex, 1);
-    ids.splice(targetIndex, 0, moved);
-    await reorderEntries(ids);
+    // Move the dragged entry toward front if it moved up, back otherwise.
+    const moved = entries[srcIndex];
+    const { error: err } = await reorderMut({ ids: [moved.id], front: targetIndex < srcIndex });
+    if (err) toast.error(err.message);
+    else reexecute({ requestPolicy: "network-only" });
   };
 
   const onDragEnd = () => {
@@ -100,9 +104,8 @@ export function QueuePage() {
   };
 
   const sortByPriority = async () => {
-    const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-    const sorted = [...entries].sort((a, b) => (priorityOrder[a.priority ?? ""] ?? 9) - (priorityOrder[b.priority ?? ""] ?? 9));
-    const { error: err } = await reorderMut({ taskIds: sorted.map((e) => e.taskId) });
+    const sorted = [...entries].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const { error: err } = await reorderMut({ ids: sorted.map((e) => e.id), front: true });
     if (err) toast.error(err.message);
     else {
       toast.success("Queue reordered by priority.");
@@ -145,11 +148,11 @@ export function QueuePage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="Depth" value={stats?.depth ?? 0} accent={(stats?.depth ?? 0) > 0} />
+        <StatCard label="Total" value={stats?.total ?? 0} accent={(stats?.total ?? 0) > 0} />
         <StatCard label="Ready" value={readyCount} />
         <StatCard label="Held" value={heldCount} accent={heldCount > 0} />
-        <StatCard label="Avg Wait" value={stats?.avgWait != null ? `${stats.avgWait.toFixed(1)}s` : "-"} />
-        <StatCard label="Throughput" value={stats?.throughput != null ? `${stats.throughput.toFixed(1)}/hr` : "-"} />
+        <StatCard label="In Flight" value={stats?.inFlight ?? 0} />
+        <StatCard label="Done" value={stats?.doneRecent ?? 0} />
       </div>
 
       {heldCount > 0 && (
@@ -197,28 +200,25 @@ export function QueuePage() {
                   <TableHead className="text-[10px] uppercase tracking-wider h-7 w-8" />
                   <TableHead className="text-[10px] uppercase tracking-wider h-7 w-12 text-center">#</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider h-7">Task</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider h-7">Title</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider h-7">Priority</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider h-7">Status</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider h-7">Wait</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wider h-7">State</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wider h-7">Enqueued</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider h-7 text-right pr-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {entries.map((entry, i) => {
-                  const held = isHeld(entry.status);
+                  const held = entry.held;
                   return (
                     <TableRow
-                      key={entry.taskId}
+                      key={entry.id}
                       draggable
                       onDragStart={() => onDragStart(i)}
                       onDragOver={(e) => onDragOver(e, i)}
                       onDrop={() => onDrop(i)}
                       onDragEnd={onDragEnd}
                       className={`border-border/20 transition-colors cursor-grab active:cursor-grabbing ${
-                        dragOverIndex === i
-                          ? "border-t-2 border-t-primary"
-                          : ""
+                        dragOverIndex === i ? "border-t-2 border-t-primary" : ""
                       } ${
                         held
                           ? "bg-[var(--ao-amber-bg)] hover:bg-[var(--ao-amber-bg)]"
@@ -241,7 +241,7 @@ export function QueuePage() {
                               ? "bg-[var(--ao-amber-bg)] text-[var(--ao-amber)] border border-[var(--ao-amber-border)]"
                               : "text-muted-foreground/50"
                         }`}>
-                          {entry.position ?? i + 1}
+                          {i + 1}
                         </span>
                       </TableCell>
                       <TableCell className="py-2">
@@ -249,22 +249,17 @@ export function QueuePage() {
                           {entry.taskId}
                         </Link>
                       </TableCell>
-                      <TableCell className="py-2 text-sm text-foreground/80 max-w-[200px] truncate">{entry.title ?? "-"}</TableCell>
                       <TableCell className="py-2">
-                        {entry.priority && <Badge variant={priorityColor(entry.priority)} className="text-[10px] h-4 px-1.5">{entry.priority}</Badge>}
+                        <Badge variant={priorityColor(priorityLabel(entry.priority))} className="text-[10px] h-4 px-1.5">{priorityLabel(entry.priority)}</Badge>
                       </TableCell>
                       <TableCell className="py-2">
-                        {entry.status && (
-                          <div className="flex items-center gap-1.5">
-                            <StatusDot status={entry.status} />
-                            <span className="text-[11px]">{entry.status}</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <StatusDot status={entry.state} />
+                          <span className="text-[11px]">{entry.state}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="py-2">
-                        <span className="text-[11px] font-mono text-muted-foreground">
-                          {entry.waitTime != null ? `${entry.waitTime.toFixed(0)}s` : "-"}
-                        </span>
+                        <span className="text-[11px] font-mono text-muted-foreground">{entry.enqueuedAt}</span>
                       </TableCell>
                       <TableCell className="py-2 text-right pr-4">
                         <div className="flex items-center justify-end gap-1">
@@ -272,9 +267,9 @@ export function QueuePage() {
                             size="sm"
                             variant="ghost"
                             className="h-6 w-6 p-0 text-muted-foreground/60 hover:text-foreground"
-                            onClick={() => moveEntry(i, -1)}
+                            onClick={() => moveToFront(entry.id)}
                             disabled={i === 0}
-                            aria-label={`Move ${entry.taskId} up`}
+                            aria-label={`Move ${entry.taskId} to front`}
                           >
                             <ArrowUp className="h-3 w-3" />
                           </Button>
@@ -282,9 +277,9 @@ export function QueuePage() {
                             size="sm"
                             variant="ghost"
                             className="h-6 w-6 p-0 text-muted-foreground/60 hover:text-foreground"
-                            onClick={() => moveEntry(i, 1)}
+                            onClick={() => moveToBack(entry.id)}
                             disabled={i === entries.length - 1}
-                            aria-label={`Move ${entry.taskId} down`}
+                            aria-label={`Move ${entry.taskId} to back`}
                           >
                             <ArrowDown className="h-3 w-3" />
                           </Button>
@@ -293,7 +288,7 @@ export function QueuePage() {
                               size="sm"
                               variant="outline"
                               className="h-6 text-[10px] gap-1 border-[var(--ao-success-border)] text-[var(--ao-success)] hover:bg-[var(--ao-success-bg)]"
-                              onClick={() => onRelease(entry.taskId)}
+                              onClick={() => onRelease(entry.id, entry.taskId)}
                             >
                               <Play className="h-2.5 w-2.5" />
                               Release
@@ -303,7 +298,7 @@ export function QueuePage() {
                               size="sm"
                               variant="outline"
                               className="h-6 text-[10px] gap-1 border-[var(--ao-amber-border)] text-[var(--ao-amber)] hover:bg-[var(--ao-amber-bg)]"
-                              onClick={() => onHold(entry.taskId)}
+                              onClick={() => onHold(entry.id, entry.taskId)}
                             >
                               <Pause className="h-2.5 w-2.5" />
                               Hold

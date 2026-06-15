@@ -1,32 +1,21 @@
-query ReadyTasks($search: String, $limit: Int) {
-  readyTasks(search: $search, limit: $limit) {
+query ReadySubjects($kind: String) {
+  subject(kind: $kind, status: READY) {
     id
     title
-    statusRaw
-    priorityRaw
-    taskTypeRaw
-  }
-}
-
-query WorkflowDefinitions {
-  workflowDefinitions {
-    id
-    name
-    description
-    phases
+    status
+    priority
+    labels
   }
 }
 
 query DispatchRequirements {
-  requirements {
+  subject(kind: "requirement") {
     id
     title
     description
-    priorityRaw
-    statusRaw
-    requirementType
-    tags
-    linkedTaskIds
-    acceptanceCriteria
+    status
+    priority
+    labels
+    children
   }
 }

@@ -41,27 +41,23 @@ describe("DaemonPage", () => {
     mocks.useQuery.mockReturnValue([
       {
         data: {
-          daemonStatus: {
-            healthy: true,
-            status: "Healthy",
-            statusRaw: "healthy",
-            runnerConnected: true,
-            activeAgents: 1,
-            maxAgents: 4,
+          daemon: {
+            running: true,
+            pid: 5678,
+            uptimeSeconds: 120,
+            version: "0.5.0",
             projectRoot: "/repo",
+            logPath: null,
           },
           daemonHealth: {
             healthy: true,
-            status: "Healthy",
-            runnerConnected: true,
-            runnerPid: 1234,
-            activeAgents: 1,
-            daemonPid: 5678,
+            status: "HEALTHY",
+            lastError: null,
+            plugins: [
+              { name: "animus-queue-default", kind: "queue", status: "HEALTHY", uptimeMs: 1000, lastError: null },
+            ],
           },
-          agentRuns: [],
-          daemonLogs: [
-            { timestamp: "2026-02-25T10:00:00Z", level: "info", message: "daemon booted" },
-          ],
+          daemonAgents: [],
         },
         fetching: false,
         error: null,
@@ -70,22 +66,18 @@ describe("DaemonPage", () => {
     ]);
   });
 
-  it("renders daemon status and controls", () => {
+  it("renders daemon status and start control", () => {
     render(<DaemonPage />);
 
     expect(screen.getByText("Daemon")).toBeTruthy();
-    expect(screen.getByText("healthy")).toBeTruthy();
+    expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Start" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Clear" })).toBeTruthy();
   });
 
-  it("renders log entries", () => {
+  it("renders plugin rows", () => {
     render(<DaemonPage />);
 
-    expect(screen.getByText("daemon booted")).toBeTruthy();
+    expect(screen.getByText("animus-queue-default")).toBeTruthy();
   });
 
   it("executes start mutation on button click", async () => {
@@ -113,10 +105,10 @@ describe("DaemonPage", () => {
   it("shows success feedback when mutation succeeds", async () => {
     render(<DaemonPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
 
     await waitFor(() => {
-      expect(mocks.toastSuccess).toHaveBeenCalledWith("Pause successful.");
+      expect(mocks.toastSuccess).toHaveBeenCalledWith("Daemon start requested.");
     });
   });
 
