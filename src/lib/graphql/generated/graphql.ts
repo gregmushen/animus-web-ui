@@ -41,6 +41,14 @@ export type DaemonAgent = {
   workflowId?: Maybe<Scalars['String']['output']>;
 };
 
+export type DaemonEvent = {
+  __typename?: 'DaemonEvent';
+  at: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  payload: Scalars['String']['output'];
+};
+
 /**
  * Daemon health report. Mirrors
  * [`animus_control_protocol::types::DaemonHealthResponse`].
@@ -464,6 +472,13 @@ export type SubjectAttachment = {
   uri: Scalars['String']['output'];
 };
 
+export type SubjectChangeEvent = {
+  __typename?: 'SubjectChangeEvent';
+  at: Scalars['String']['output'];
+  change: Scalars['String']['output'];
+  subjectId: Scalars['ID']['output'];
+};
+
 /**
  * Normalized cross-backend subject status. Mirrors
  * [`animus_subject_protocol::SubjectStatus`].
@@ -475,6 +490,24 @@ export enum SubjectStatus {
   InProgress = 'IN_PROGRESS',
   Ready = 'READY'
 }
+
+export type SubscriptionRoot = {
+  __typename?: 'SubscriptionRoot';
+  daemonEvents: DaemonEvent;
+  subjectChanged: SubjectChangeEvent;
+  workflowEvents: WorkflowEvent;
+};
+
+
+export type SubscriptionRootSubjectChangedArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionRootWorkflowEventsArgs = {
+  kinds?: InputMaybe<Array<Scalars['String']['input']>>;
+  workflowId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type UpdateSubjectInput = {
   /** `Some(...)` sets the assignee; pass an empty string to clear it. */
@@ -505,6 +538,14 @@ export type Workflow = {
   startedAt: Scalars['String']['output'];
   status: WorkflowStatus;
   subjectId?: Maybe<Scalars['ID']['output']>;
+};
+
+export type WorkflowEvent = {
+  __typename?: 'WorkflowEvent';
+  at: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  payload: Scalars['String']['output'];
+  workflowId: Scalars['ID']['output'];
 };
 
 /**
@@ -562,6 +603,26 @@ export type DaemonActivityQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type DaemonActivityQuery = { __typename?: 'QueryRoot', daemonAgents: Array<{ __typename?: 'DaemonAgent', sessionId: string, provider: string, model: string, workflowId?: string | null, phaseId?: string | null, startedAt: string }>, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, status: HealthStatus, lastError?: string | null } };
+
+export type DaemonEventsSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DaemonEventsSubscription = { __typename?: 'SubscriptionRoot', daemonEvents: { __typename?: 'DaemonEvent', id: string, kind: string, payload: string, at: string } };
+
+export type WorkflowEventsSubscriptionVariables = Exact<{
+  workflowId?: InputMaybe<Scalars['ID']['input']>;
+  kinds?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+}>;
+
+
+export type WorkflowEventsSubscription = { __typename?: 'SubscriptionRoot', workflowEvents: { __typename?: 'WorkflowEvent', workflowId: string, kind: string, payload: string, at: string } };
+
+export type SubjectChangedSubscriptionVariables = Exact<{
+  kind?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type SubjectChangedSubscription = { __typename?: 'SubscriptionRoot', subjectChanged: { __typename?: 'SubjectChangeEvent', subjectId: string, change: string, at: string } };
 
 export type QueueQueryVariables = Exact<{
   state?: InputMaybe<QueueState>;
@@ -837,6 +898,35 @@ export const DaemonActivityDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DaemonActivityQuery, DaemonActivityQueryVariables>;
+export const DaemonEventsDocument = new TypedDocumentString(`
+    subscription DaemonEvents {
+  daemonEvents {
+    id
+    kind
+    payload
+    at
+  }
+}
+    `) as unknown as TypedDocumentString<DaemonEventsSubscription, DaemonEventsSubscriptionVariables>;
+export const WorkflowEventsDocument = new TypedDocumentString(`
+    subscription WorkflowEvents($workflowId: ID, $kinds: [String!]) {
+  workflowEvents(workflowId: $workflowId, kinds: $kinds) {
+    workflowId
+    kind
+    payload
+    at
+  }
+}
+    `) as unknown as TypedDocumentString<WorkflowEventsSubscription, WorkflowEventsSubscriptionVariables>;
+export const SubjectChangedDocument = new TypedDocumentString(`
+    subscription SubjectChanged($kind: String) {
+  subjectChanged(kind: $kind) {
+    subjectId
+    change
+    at
+  }
+}
+    `) as unknown as TypedDocumentString<SubjectChangedSubscription, SubjectChangedSubscriptionVariables>;
 export const QueueDocument = new TypedDocumentString(`
     query Queue($state: QueueState) {
   queue(state: $state) {

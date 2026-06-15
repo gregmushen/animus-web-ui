@@ -18,6 +18,185 @@ import {
 import type { WorkflowsQuery, WorkflowDetailQuery } from "@/lib/graphql/generated/graphql";
 import { statusColor, StatusDot, PageLoading, PageError, StatCard, SectionHeading } from "./shared";
 
+// The `detail` blob is an opaque, backend-defined JSON string. Its shape is
+// not guaranteed, so we probe for the common WorkflowRun fields (phase history,
+// decisions, checkpoints) defensively and fall back to a collapsible raw view
+// for everything we don't recognize.
+function pick(obj: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const k of keys) {
+    if (obj[k] != null) return obj[k];
+  }
+  return undefined;
+}
+
+function asArray(v: unknown): Record<string, unknown>[] | null {
+  if (Array.isArray(v)) return v as Record<string, unknown>[];
+  return null;
+}
+
+// First key in `keys` that is present (non-null) in obj, or "" if none.
+function matchedKey(obj: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    if (obj[k] != null) return k;
+  }
+  return "";
+}
+
+function fieldText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function PhaseList({ phases }: { phases: Record<string, unknown>[] }) {
+  return (
+    <div className="space-y-1.5">
+      {phases.map((p, i) => {
+        const id = fieldText(pick(p, "phase_id", "phaseId", "id", "name")) || `phase ${i + 1}`;
+        const status = fieldText(pick(p, "status", "state", "outcome"));
+        const provider = fieldText(pick(p, "provider", "tool", "model"));
+        const started = fieldText(pick(p, "started_at", "startedAt"));
+        const finished = fieldText(pick(p, "completed_at", "finished_at", "completedAt", "finishedAt"));
+        return (
+          <div key={`${id}-${i}`} className="flex items-center gap-2 rounded-md border border-border/30 bg-muted/10 px-3 py-1.5">
+            {status && <StatusDot status={status} />}
+            <span className="font-mono text-xs font-medium">{id}</span>
+            {status && <Badge variant={statusColor(status)} className="text-[10px]">{status.toLowerCase()}</Badge>}
+            {provider && <span className="text-[10px] text-muted-foreground/60 font-mono">{provider}</span>}
+            <span className="ml-auto text-[10px] text-muted-foreground/40 font-mono">
+              {finished || started}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DecisionList({ decisions }: { decisions: Record<string, unknown>[] }) {
+  return (
+    <div className="space-y-1.5">
+      {decisions.map((d, i) => {
+        const phase = fieldText(pick(d, "phase_id", "phaseId", "phase", "gate"));
+        const decision = fieldText(pick(d, "decision", "outcome", "verdict", "action"));
+        const reason = fieldText(pick(d, "reason", "rationale", "notes", "message"));
+        return (
+          <div key={i} className="rounded-md border border-border/30 bg-muted/10 px-3 py-1.5">
+            <div className="flex items-center gap-2">
+              {phase && <span className="font-mono text-xs">{phase}</span>}
+              {decision && <Badge variant={statusColor(decision)} className="text-[10px]">{decision.toLowerCase()}</Badge>}
+            </div>
+            {reason && <p className="text-[11px] text-muted-foreground/70 mt-1">{reason}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CollapsibleJson({ label, value }: { label: string; value: unknown }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-md border border-border/30 bg-muted/10">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-accent/20 transition-colors"
+      >
+        <span className="font-mono text-muted-foreground/70">{label}</span>
+        <span className="text-muted-foreground/40">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <pre className="text-[11px] font-mono overflow-auto max-h-80 p-3 whitespace-pre-wrap border-t border-border/20">
+          {JSON.stringify(value, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function WorkflowDetailView({ detail }: { detail: unknown }) {
+  if (detail == null || typeof detail !== "object" || Array.isArray(detail)) {
+    return (
+      <pre className="text-xs font-mono overflow-auto max-h-96 p-3 rounded bg-muted/20 whitespace-pre-wrap">
+        {JSON.stringify(detail, null, 2)}
+      </pre>
+    );
+  }
+  const obj = detail as Record<string, unknown>;
+  // Track exactly which keys we consume into a structured section so the
+  // fallback can still surface any known key whose shape we couldn't render
+  // (e.g. `phases` arriving as an object/map rather than an array).
+  const consumed = new Set<string>();
+  const pickConsume = (...keys: string[]): unknown => {
+    for (const k of keys) {
+      if (obj[k] != null) { consumed.add(k); return obj[k]; }
+    }
+    return undefined;
+  };
+  const status = fieldText(pickConsume("status", "state"));
+  const phases = asArray(pickConsume("phases", "phase_history", "phaseHistory", "history"));
+  const decisions = asArray(pickConsume("decisions", "decision_log", "decisionLog"));
+  const checkpoints = asArray(pickConsume("checkpoints", "checkpoint_log", "checkpointLog"));
+  // If a consumed key's value wasn't actually array-renderable, keep it in the
+  // fallback view so nothing the raw JSON would have shown is silently dropped.
+  if (phases == null) consumed.delete(matchedKey(obj, "phases", "phase_history", "phaseHistory", "history"));
+  if (decisions == null) consumed.delete(matchedKey(obj, "decisions", "decision_log", "decisionLog"));
+  if (checkpoints == null) consumed.delete(matchedKey(obj, "checkpoints", "checkpoint_log", "checkpointLog"));
+  const rest = Object.fromEntries(Object.entries(obj).filter(([k]) => !consumed.has(k)));
+  const hasStructured = status || phases || decisions || checkpoints;
+
+  return (
+    <div className="space-y-3">
+      {status && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground w-24 shrink-0">Run status</span>
+          <Badge variant={statusColor(status)}>{status.toLowerCase()}</Badge>
+        </div>
+      )}
+      {phases && phases.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1.5">Phases ({phases.length})</p>
+          <PhaseList phases={phases} />
+        </div>
+      )}
+      {decisions && decisions.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1.5">Decisions ({decisions.length})</p>
+          <DecisionList decisions={decisions} />
+        </div>
+      )}
+      {checkpoints && checkpoints.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1.5">Checkpoints ({checkpoints.length})</p>
+          <CollapsibleJson label={`${checkpoints.length} checkpoint(s)`} value={checkpoints} />
+        </div>
+      )}
+      {Object.keys(rest).length > 0 && (
+        <div>
+          {!hasStructured && (
+            <p className="text-[11px] text-muted-foreground/50 mb-1.5">
+              Unrecognized detail shape — showing structured fields.
+            </p>
+          )}
+          <div className="space-y-1.5">
+            {Object.entries(rest).map(([k, v]) =>
+              v != null && typeof v === "object" ? (
+                <CollapsibleJson key={k} label={k} value={v} />
+              ) : (
+                <div key={k} className="flex gap-2 text-xs px-3 py-1">
+                  <span className="text-muted-foreground/60 font-mono w-40 shrink-0 truncate">{k}</span>
+                  <span className="font-mono break-all">{fieldText(v)}</span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type WfSummary = WorkflowsQuery["workflows"][number];
 
 function statusLabel(status: WorkflowStatus): string {
@@ -287,19 +466,14 @@ export function WorkflowDetailPage() {
         </CardContent>
       </Card>
 
-      {/* TODO(E-followup): richer rendering for proper phase/decision UI */}
       <Card className="border-border/40 bg-card/60">
         <CardHeader className="pb-2 pt-3 px-4">
-          <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Detail</CardTitle>
+          <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Run Detail</CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-3">
           {parseError && <p className="text-xs text-destructive">Failed to parse detail: {parseError}</p>}
           {!wf.detail && !parseError && <p className="text-xs text-muted-foreground/60">No detail available</p>}
-          {parsedDetail != null && (
-            <pre className="text-xs font-mono overflow-auto max-h-96 p-3 rounded bg-muted/20 whitespace-pre-wrap">
-              {JSON.stringify(parsedDetail, null, 2)}
-            </pre>
-          )}
+          {parsedDetail != null && <WorkflowDetailView detail={parsedDetail} />}
         </CardContent>
       </Card>
     </div>

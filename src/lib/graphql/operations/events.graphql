@@ -13,3 +13,29 @@ query DaemonActivity {
     lastError
   }
 }
+
+subscription DaemonEvents {
+  daemonEvents {
+    id
+    kind
+    payload
+    at
+  }
+}
+
+subscription WorkflowEvents($workflowId: ID, $kinds: [String!]) {
+  workflowEvents(workflowId: $workflowId, kinds: $kinds) {
+    workflowId
+    kind
+    payload
+    at
+  }
+}
+
+subscription SubjectChanged($kind: String) {
+  subjectChanged(kind: $kind) {
+    subjectId
+    change
+    at
+  }
+}

@@ -20,6 +20,7 @@ import {
   SubjectDetailDocument,
   CreateSubjectDocument,
   SetSubjectStatusDocument,
+  UpdateSubjectDocument,
   RunWorkflowDocument,
   SubjectStatus,
 } from "@/lib/graphql/generated/graphql";
@@ -229,9 +230,13 @@ export function TaskDetailPage() {
     variables: { id: taskId! },
   });
   const [, setStatus] = useMutation(SetSubjectStatusDocument);
+  const [, updateSubject] = useMutation(UpdateSubjectDocument);
   const [, runWorkflow] = useMutation(RunWorkflowDocument);
 
   const [targetStatus, setTargetStatus] = useState<SubjectStatus | "">("");
+  const [assigneeDraft, setAssigneeDraft] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
 
   const { data, fetching, error } = result;
@@ -257,6 +262,40 @@ export function TaskDetailPage() {
     const { error: err } = await runWorkflow({ taskId: subject.id });
     if (err) showFeedback("error", err.message);
     else showFeedback("ok", "Workflow dispatched.");
+  };
+
+  // `assigneeDraft === null` means "not editing"; track the current value
+  // against the live subject so we only send a change when it actually differs.
+  const currentAssignee = subject.assignee ?? "";
+  const assigneeValue = assigneeDraft ?? currentAssignee;
+
+  const saveAssignee = async () => {
+    const next = (assigneeDraft ?? currentAssignee).trim();
+    if (next === currentAssignee.trim()) { setAssigneeDraft(null); return; }
+    setSavingEdit(true);
+    // Empty string clears the assignee (per schema contract).
+    const { error: err } = await updateSubject({ input: { id: taskId!, assignee: next } });
+    setSavingEdit(false);
+    if (err) showFeedback("error", err.message);
+    else { showFeedback("ok", next ? `Assignee set to ${next}.` : "Assignee cleared."); setAssigneeDraft(null); reload(); }
+  };
+
+  const addLabel = async () => {
+    const label = newLabel.trim();
+    if (!label || subject.labels.includes(label)) { setNewLabel(""); return; }
+    setSavingEdit(true);
+    const { error: err } = await updateSubject({ input: { id: taskId!, labelsAdd: [label] } });
+    setSavingEdit(false);
+    if (err) showFeedback("error", err.message);
+    else { showFeedback("ok", `Label "${label}" added.`); setNewLabel(""); reload(); }
+  };
+
+  const removeLabel = async (label: string) => {
+    setSavingEdit(true);
+    const { error: err } = await updateSubject({ input: { id: taskId!, labelsRemove: [label] } });
+    setSavingEdit(false);
+    if (err) showFeedback("error", err.message);
+    else { showFeedback("ok", `Label "${label}" removed.`); reload(); }
   };
 
   return (
@@ -310,6 +349,60 @@ export function TaskDetailPage() {
               <Button size="sm" onClick={applyStatus} disabled={!targetStatus || targetStatus === subject.status}>
                 Apply
               </Button>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border/30 space-y-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1">Assignee</div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={assigneeValue}
+                    placeholder="unassigned"
+                    onChange={(e) => setAssigneeDraft(e.target.value)}
+                    className="h-9 flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={saveAssignee}
+                    disabled={savingEdit || (assigneeValue.trim() === currentAssignee.trim())}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1">Labels</div>
+                <div className="flex gap-1 flex-wrap mb-2">
+                  {subject.labels.length === 0 && <span className="text-xs text-muted-foreground/50">none</span>}
+                  {subject.labels.map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => removeLabel(l)}
+                      className="group inline-flex items-center gap-1 rounded-md border border-border/40 px-2 py-0.5 text-[10px] hover:bg-destructive/10 hover:border-destructive/40 transition-colors disabled:opacity-50"
+                      title="Remove label"
+                    >
+                      {l}<span className="text-muted-foreground/50 group-hover:text-destructive">×</span>
+                    </button>
+                  ))}
+                </div>
+                <form
+                  onSubmit={(e) => { e.preventDefault(); void addLabel(); }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    value={newLabel}
+                    placeholder="Add label..."
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    className="h-9 flex-1"
+                  />
+                  <Button type="submit" size="sm" variant="outline" disabled={savingEdit || !newLabel.trim()}>
+                    Add
+                  </Button>
+                </form>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -414,7 +507,6 @@ export function TaskDetailPage() {
         </>
       )}
 
-      {/* TODO(E-followup): richer rendering — assignee/label edits via UpdateSubjectDocument, inline edit form */}
     </div>
   );
 }
