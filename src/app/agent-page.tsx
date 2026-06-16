@@ -7,8 +7,10 @@ import { DaemonDocument } from "@/lib/graphql/generated/graphql";
 import type { DaemonQuery } from "@/lib/graphql/generated/graphql";
 import { StatusDot, PageLoading, PageError, SectionHeading } from "./shared";
 
-// TODO(E-followup): richer rendering — per-agent phase output is no longer
-// exposed over the kernel control surface, so cards show session metadata only.
+// NOTE(E-followup): the kernel schema exposes no per-agent phase-output stream
+// (only `daemonAgents` session metadata + the `workflowEvents`/`daemonEvents`
+// subscriptions), so agent cards show session metadata only. A richer per-agent
+// output view requires a transport-graphql schema extension.
 type AgentInfo = NonNullable<DaemonQuery["daemonAgents"]>[number];
 
 function useElapsedTime(startedAt: string | null | undefined): string {

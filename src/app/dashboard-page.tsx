@@ -64,14 +64,14 @@ export function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/tasks/new">New Task</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/tasks/new" />}>
+          New Task
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/workflows/dispatch/task">Run Workflow</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/workflows/dispatch/task" />}>
+          Run Workflow
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/queue">View Queue</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/queue" />}>
+          View Queue
         </Button>
       </div>
 

@@ -27,8 +27,11 @@ function priorityLabel(p: number | null | undefined): string {
   return PRIORITY_LABELS[p ?? 0] ?? "none";
 }
 
-// TODO(E-followup): richer rendering — replace free-text workflow definition
-// name with a catalog of installed workflow definitions when a backend query exists.
+// TODO(E-followup): the kernel GraphQL schema (QueryRoot) exposes no
+// workflow-definitions/catalog query as of animus-protocol v0.5.12 — only
+// `workflows`/`workflow` (runs) exist. Until transport-graphql adds a
+// definitions query we keep the free-text definition-name input. Wire a
+// <select> here once that query lands.
 function WorkflowDefinitionInput({
   value,
   onChange,
@@ -488,7 +491,9 @@ export function CustomDispatchPage() {
             />
           </div>
           <div>
-            {/* TODO(E-followup): richer rendering — accept either a workflow definition name or inline YAML */}
+            {/* TODO(E-followup): UX — `executeWorkflow(definition: String!)` accepts a
+                definition name today; a future pass could let this field also take inline
+                YAML. Not schema-blocked, purely an input-affordance enhancement. */}
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Definition</label>
             <Textarea
               rows={6}

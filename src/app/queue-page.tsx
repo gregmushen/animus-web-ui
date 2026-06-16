@@ -177,8 +177,8 @@ export function QueuePage() {
                 <p className="text-sm text-muted-foreground/60">Queue is empty</p>
                 <p className="text-xs text-muted-foreground/40 mt-1">Tasks will appear here when workflows are dispatched</p>
               </div>
-              <Button variant="outline" size="sm" asChild className="mt-2">
-                <Link to="/workflows/dispatch/task">Dispatch Workflow</Link>
+              <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/workflows/dispatch/task" />} className="mt-2">
+                Dispatch Workflow
               </Button>
             </div>
           </CardContent>

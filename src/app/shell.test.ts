@@ -10,7 +10,7 @@ describe("PRIMARY_NAV_ITEMS", () => {
   });
 
   it("points to registered routes only", () => {
-    const routePathSet = new Set(APP_ROUTE_PATHS);
+    const routePathSet = new Set<string>(APP_ROUTE_PATHS);
     const unknownNavTargets = PRIMARY_NAV_ITEMS
       .map((item) => item.to)
       .filter((path) => !routePathSet.has(path));

@@ -25,6 +25,7 @@ import {
   Clock,
   Map,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -39,29 +40,41 @@ import { useQuery } from "@/lib/graphql/client";
 import { DashboardDocument } from "@/lib/graphql/generated/graphql";
 import type { DashboardQuery } from "@/lib/graphql/generated/graphql";
 
-export const NAV_GROUPS = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  badgeKey: string | null;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operate",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badgeKey: null },
-      { to: "/tasks", label: "Tasks", icon: ListTodo, badgeKey: "tasks" as const },
+      { to: "/tasks", label: "Tasks", icon: ListTodo, badgeKey: "tasks" },
       { to: "/requirements", label: "Requirements", icon: ClipboardCheck, badgeKey: null },
-      { to: "/workflows", label: "Workflows", icon: GitBranch, badgeKey: "workflows" as const },
-      { to: "/queue", label: "Queue", icon: Layers, badgeKey: "queue" as const },
-      { to: "/agents", label: "Agents", icon: Bot, badgeKey: "agents" as const },
+      { to: "/workflows", label: "Workflows", icon: GitBranch, badgeKey: "workflows" },
+      { to: "/queue", label: "Queue", icon: Layers, badgeKey: "queue" },
+      { to: "/agents", label: "Agents", icon: Bot, badgeKey: "agents" },
       { to: "/ops-map", label: "Ops Map", icon: Map, badgeKey: null },
     ],
   },
   {
     label: "Monitor",
     items: [
-      { to: "/events", label: "Events", icon: Activity, badgeKey: "events" as const },
+      { to: "/events", label: "Events", icon: Activity, badgeKey: "events" },
       { to: "/history", label: "History", icon: Clock, badgeKey: null },
       { to: "/daemon", label: "Daemon", icon: Server, badgeKey: null },
       { to: "/architecture", label: "Architecture", icon: Share2, badgeKey: null },
     ],
   },
-] as const;
+];
 
 export const PRIMARY_NAV_ITEMS = NAV_GROUPS.flatMap(g => g.items);
 
@@ -113,11 +126,13 @@ function AppShellFrame() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-11 items-center gap-3 border-b border-border/50 px-4 bg-[var(--ao-surface)]/60 backdrop-blur-md">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden h-7 w-7">
-                <Menu className="h-4 w-4" />
-                <span className="sr-only">Toggle navigation</span>
-              </Button>
+            <SheetTrigger
+              render={
+                <Button variant="ghost" size="icon" className="md:hidden h-7 w-7" />
+              }
+            >
+              <Menu className="h-4 w-4" />
+              <span className="sr-only">Toggle navigation</span>
             </SheetTrigger>
             <SheetContent side="left" className="w-60 p-0 bg-[var(--ao-surface)] border-border/50">
               <SidebarContent />

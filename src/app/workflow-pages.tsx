@@ -1,6 +1,6 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery, useMutation } from "@/lib/graphql/client";
+import { useQuery, useMutation, useSubscription } from "@/lib/graphql/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,14 @@ import {
   PauseWorkflowDocument,
   ResumeWorkflowDocument,
   CancelWorkflowDocument,
+  WorkflowEventsDocument,
   WorkflowStatus,
 } from "@/lib/graphql/generated/graphql";
-import type { WorkflowsQuery, WorkflowDetailQuery } from "@/lib/graphql/generated/graphql";
+import type {
+  WorkflowsQuery,
+  WorkflowDetailQuery,
+  WorkflowEventsSubscription,
+} from "@/lib/graphql/generated/graphql";
 import { statusColor, StatusDot, PageLoading, PageError, StatCard, SectionHeading } from "./shared";
 
 // The `detail` blob is an opaque, backend-defined JSON string. Its shape is
@@ -115,7 +120,7 @@ function CollapsibleJson({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-function WorkflowDetailView({ detail }: { detail: unknown }) {
+export function WorkflowDetailView({ detail }: { detail: unknown }) {
   if (detail == null || typeof detail !== "object" || Array.isArray(detail)) {
     return (
       <pre className="text-xs font-mono overflow-auto max-h-96 p-3 rounded bg-muted/20 whitespace-pre-wrap">
@@ -369,11 +374,49 @@ export function WorkflowDetailPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const { data, fetching, error } = result;
-  if (fetching) return <PageLoading />;
-  if (error) return <PageError message={error.message} />;
-
   const wf = data?.workflow;
+
+  // Per-workflow live updates: stream `workflowEvents(workflowId)` over
+  // graphql-ws and refetch the detail query whenever a phase/workflow event
+  // lands so the structured detail (phases, decisions, status) stays current
+  // without polling. We stop subscribing once the run reaches a terminal
+  // state. `pause` is keyed on the resolved status so the effect re-subscribes
+  // only when liveness actually changes.
+  const isTerminalStatus =
+    wf != null &&
+    [WorkflowStatus.Completed, WorkflowStatus.Failed, WorkflowStatus.Cancelled].includes(wf.status);
+  const [lastEvent, setLastEvent] = useState<WorkflowEventsSubscription["workflowEvents"] | null>(null);
+  const [{ error: streamError }] = useSubscription<WorkflowEventsSubscription>(
+    {
+      query: WorkflowEventsDocument,
+      variables: { workflowId: workflowId! },
+      pause: !workflowId || isTerminalStatus,
+    },
+    (_prev, next) => {
+      const evt = next?.workflowEvents;
+      if (evt) setLastEvent(evt);
+      return next;
+    },
+  );
+
+  // Refetch detail when a NEW live event arrives. `reexecute` is recreated on
+  // each render, so we hold it in a ref and key the effect on the event's
+  // stable timestamp+kind — this fires exactly once per websocket message
+  // rather than on every subsequent render.
+  const reexecuteRef = useRef(reexecute);
+  useEffect(() => {
+    reexecuteRef.current = reexecute;
+  }, [reexecute]);
+  const lastEventKey = lastEvent ? `${lastEvent.at}:${lastEvent.kind}` : null;
+  useEffect(() => {
+    if (lastEventKey) reexecuteRef.current();
+  }, [lastEventKey]);
+
+  if (fetching && !data) return <PageLoading />;
+  if (error) return <PageError message={error.message} />;
   if (!wf) return <PageError message={`Workflow ${workflowId} not found.`} />;
+
+  const isLive = !isTerminalStatus && !streamError;
 
   let parsedDetail: unknown = null;
   let parseError: string | null = null;
@@ -417,6 +460,17 @@ export function WorkflowDetailPage() {
           <div className="flex gap-2 mt-2 items-center">
             <Badge variant={statusColor(statusLabel(wf.status))}>{statusLabel(wf.status)}</Badge>
             <Badge variant="outline">{wf.definition}</Badge>
+            {isLive && (
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                <StatusDot status="running" />
+                live
+              </span>
+            )}
+            {lastEvent && (
+              <span className="text-[10px] text-muted-foreground/40 font-mono" title={lastEvent.at}>
+                last event: {lastEvent.kind}
+              </span>
+            )}
           </div>
         </div>
         {!isTerminal && (

@@ -1,6 +1,6 @@
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useQuery, useMutation } from "@/lib/graphql/client";
+import { useQuery, useMutation, useSubscription } from "@/lib/graphql/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,14 @@ import {
   SetSubjectStatusDocument,
   UpdateSubjectDocument,
   RunWorkflowDocument,
+  SubjectChangedDocument,
   SubjectStatus,
 } from "@/lib/graphql/generated/graphql";
-import type { SubjectsQuery, SubjectDetailQuery } from "@/lib/graphql/generated/graphql";
+import type {
+  SubjectsQuery,
+  SubjectDetailQuery,
+  SubjectChangedSubscription,
+} from "@/lib/graphql/generated/graphql";
 import { statusColor, priorityColor, PageLoading, PageError, SectionHeading, Markdown } from "./shared";
 
 const PRIORITY_LABELS = ["none", "low", "medium", "high", "critical"];
@@ -51,11 +56,28 @@ export function TasksPage({ kind = "task" }: { kind?: string } = {}) {
 
   const statusVar = STATUS_OPTIONS.find((s) => s === statusFilter);
 
-  const [result] = useQuery<SubjectsQuery>({
+  const [result, reexecute] = useQuery<SubjectsQuery>({
     query: SubjectsDocument,
     variables: { kind, status: statusVar },
   });
   const { data, fetching, error } = result;
+
+  // Live subject list: refetch when the daemon reports a subject change for
+  // this kind over the `subjectChanged` graphql-ws subscription. `reexecute`
+  // is recreated each render, so we hold it in a ref and key the effect on the
+  // change event's stable timestamp+id — firing once per websocket message.
+  const [{ data: lastChange }] = useSubscription<
+    SubjectChangedSubscription,
+    SubjectChangedSubscription["subjectChanged"] | undefined
+  >({ query: SubjectChangedDocument, variables: { kind } }, (_prev, next) => next?.subjectChanged);
+  const reexecuteRef = useRef(reexecute);
+  useEffect(() => {
+    reexecuteRef.current = reexecute;
+  }, [reexecute]);
+  const lastChangeKey = lastChange ? `${lastChange.at}:${lastChange.subjectId}:${lastChange.change}` : null;
+  useEffect(() => {
+    if (lastChangeKey) reexecuteRef.current();
+  }, [lastChangeKey]);
 
   const subjects = data?.subject ?? [];
 

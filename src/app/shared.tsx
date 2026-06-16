@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -69,8 +68,8 @@ export function SectionHeading({ children }: { children: ReactNode }) {
 
 export function Markdown({ content, className }: { content: string; className?: string }) {
   return (
+    <div className={`max-w-none ${className ?? ""}`}>
     <ReactMarkdown
-      className={`max-w-none ${className ?? ""}`}
       components={{
         h1: ({ children }) => <h1 className="text-lg font-semibold mt-4 mb-2">{children}</h1>,
         h2: ({ children }) => <h2 className="text-base font-semibold mt-3 mb-1.5">{children}</h2>,
@@ -79,7 +78,7 @@ export function Markdown({ content, className }: { content: string; className?: 
         ul: ({ children }) => <ul className="list-disc list-inside text-sm space-y-0.5 mb-2 text-foreground/80">{children}</ul>,
         ol: ({ children }) => <ol className="list-decimal list-inside text-sm space-y-0.5 mb-2 text-foreground/80">{children}</ol>,
         li: ({ children }) => <li className="text-sm">{children}</li>,
-        code: ({ className: codeClassName, children, ...props }) => {
+        code: ({ className: codeClassName, children }) => {
           const isInline = !codeClassName;
           if (isInline) {
             return <code className="px-1 py-0.5 rounded bg-muted text-[12px] font-mono text-foreground/90">{children}</code>;
@@ -110,5 +109,6 @@ export function Markdown({ content, className }: { content: string; className?: 
     >
       {content}
     </ReactMarkdown>
+    </div>
   );
 }

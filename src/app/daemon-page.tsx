@@ -15,8 +15,14 @@ import { DaemonDocument, StartDaemonDocument } from "@/lib/graphql/generated/gra
 import type { DaemonQuery } from "@/lib/graphql/generated/graphql";
 import { StatusDot, PageLoading, PageError, SectionHeading } from "./shared";
 
-// TODO(E-followup): richer rendering — the kernel no longer exposes daemon
-// logs or pause/stop/resume over the control socket; only startDaemon remains.
+// NOTE(E-followup): the kernel GraphQL schema (animus-protocol v0.5.12)
+// exposes ONLY `startDaemon` on MutationRoot — `daemon/stop` and
+// `daemon/restart` are intentionally forbidden over the control socket, and
+// there are no `pauseDaemon`/`resumeDaemon` mutations or a `daemonLogs` query.
+// (Pause/resume live on workflows: see `pauseWorkflow`/`resumeWorkflow`, wired
+// on the workflow detail page.) So this page surfaces status + a Start action
+// only; a logs panel / pause-resume controls require a transport-graphql
+// schema extension before they can be wired.
 export function DaemonPage() {
   const [result, reexecute] = useQuery<DaemonQuery>({ query: DaemonDocument });
   const [, startMut] = useMutation(StartDaemonDocument);

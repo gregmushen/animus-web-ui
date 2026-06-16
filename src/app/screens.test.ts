@@ -46,7 +46,7 @@ const featureModules = [
 describe("feature page modules", () => {
   for (const { name, load, exports: requiredExports } of featureModules) {
     it(`${name} exports renderable page components`, async () => {
-      const module = await load();
+      const module = (await load()) as Record<string, unknown>;
 
       for (const exportName of requiredExports) {
         expect(module).toHaveProperty(exportName);
