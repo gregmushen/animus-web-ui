@@ -133,7 +133,11 @@ export function useSubscription<TData = any, TResult = TData>(
   const [error, setError] = useState<{ message: string } | undefined>();
   const [result, setResult] = useState<TResult | undefined>();
   const resultRef = useRef(result);
-  resultRef.current = result;
+  // Keep the ref current outside render (react-hooks/refs): the async
+  // subscription `next` handler reads resultRef.current to fold into `handler`.
+  useEffect(() => {
+    resultRef.current = result;
+  }, [result]);
 
   useEffect(() => {
     if (opts.pause) {
