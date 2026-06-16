@@ -4,7 +4,7 @@ import { useQuery } from "@/lib/graphql/client";
 import { DashboardDocument } from "@/lib/graphql/generated/graphql";
 import { PageError, PageLoading } from "./shared";
 
-const WORKFLOWS_QUERY = `query ActiveWorkflows { workflows(status: "running") { id taskId status statusRaw currentPhase phases { phaseId status startedAt completedAt } } }`;
+const WORKFLOWS_QUERY = `query ActiveWorkflows { workflows(status: RUNNING) { id definition status subjectId startedAt finishedAt } }`;
 
 function TaskPoolNode({ data }: { data: { total: number; ready: number; inProgress: number; blocked: number; done: number } }) {
   return (
@@ -95,18 +95,19 @@ function buildGraph(dashData: any, workflows: any[]) {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  const byStatus: Record<string, number> = dashData?.taskStats?.byStatus ? JSON.parse(dashData.taskStats.byStatus) : {};
+  const subjects: any[] = dashData?.subject ?? [];
+  const countBy = (s: string) => subjects.filter((t) => t.status === s).length;
 
   nodes.push({
     id: "task-pool",
     type: "taskPool",
     position: { x: 0, y: 50 },
     data: {
-      total: dashData?.taskStats?.total ?? 0,
-      ready: byStatus["ready"] ?? 0,
-      inProgress: byStatus["in-progress"] ?? 0,
-      blocked: byStatus["blocked"] ?? 0,
-      done: byStatus["done"] ?? 0,
+      total: subjects.length,
+      ready: countBy("READY"),
+      inProgress: countBy("IN_PROGRESS"),
+      blocked: countBy("BLOCKED"),
+      done: countBy("DONE"),
     },
   });
 
@@ -114,7 +115,7 @@ function buildGraph(dashData: any, workflows: any[]) {
     id: "queue",
     type: "queue",
     position: { x: 0, y: 300 },
-    data: { depth: dashData?.queueStats?.depth ?? 0, held: 0 },
+    data: { depth: dashData?.queueStats?.total ?? 0, held: dashData?.queueStats?.held ?? 0 },
   });
 
   const health = dashData?.daemonHealth;
@@ -125,7 +126,7 @@ function buildGraph(dashData: any, workflows: any[]) {
     data: {
       healthy: health?.healthy ?? false,
       status: health?.status ?? "unknown",
-      agents: dashData?.agentRuns?.length ?? 0,
+      agents: dashData?.daemonAgents?.length ?? 0,
     },
   });
 
@@ -134,21 +135,19 @@ function buildGraph(dashData: any, workflows: any[]) {
     { id: "e-queue-daemon", source: "queue", target: "daemon", animated: true, style: { stroke: "var(--primary)", strokeWidth: 2 } },
   );
 
-  const running = workflows.filter((w: any) => w.statusRaw === "running" || w.status === "Running");
+  const running = workflows.filter((w: any) => w.status === "RUNNING");
   if (running.length > 0) {
     running.forEach((wf: any, i: number) => {
-      const phases = wf.phases ?? [];
-      const done = phases.filter((p: any) => p.status === "completed").length;
       nodes.push({
         id: `wf-${wf.id}`,
         type: "workflow",
         position: { x: 700, y: i * 120 },
         data: {
           id: wf.id,
-          taskId: wf.taskId,
-          currentPhase: wf.currentPhase ?? "",
-          phasesDone: done,
-          phasesTotal: phases.length,
+          taskId: wf.subjectId ?? wf.id,
+          currentPhase: wf.definition ?? "",
+          phasesDone: 0,
+          phasesTotal: 0,
         },
       });
       edges.push({
@@ -174,9 +173,9 @@ function buildGraph(dashData: any, workflows: any[]) {
     });
   }
 
-  const doneCount = byStatus["done"] ?? 0;
-  const failedWorkflows = workflows.filter((w: any) => w.statusRaw === "failed").length;
-  const escalatedWorkflows = workflows.filter((w: any) => w.statusRaw === "escalated").length;
+  const doneCount = countBy("DONE");
+  const failedWorkflows = workflows.filter((w: any) => w.status === "FAILED").length;
+  const escalatedWorkflows = workflows.filter((w: any) => w.status === "PAUSED").length;
 
   nodes.push(
     { id: "completed", type: "outcome", position: { x: 1050, y: 0 }, data: { label: "Completed", count: doneCount, color: "--ao-success" } },

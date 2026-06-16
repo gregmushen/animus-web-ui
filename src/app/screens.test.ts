@@ -14,7 +14,7 @@ const featureModules = [
   {
     name: "workflow-pages",
     load: () => import("./workflow-pages"),
-    exports: ["WorkflowsPage", "WorkflowDetailPage", "WorkflowCheckpointPage"],
+    exports: ["WorkflowsPage", "WorkflowDetailPage"],
   },
   {
     name: "queue-page",
@@ -27,19 +27,9 @@ const featureModules = [
     exports: ["DaemonPage"],
   },
   {
-    name: "projects-pages",
-    load: () => import("./projects-pages"),
-    exports: ["ProjectsPage", "ProjectDetailPage", "RequirementDetailPage"],
-  },
-  {
     name: "events-page",
     load: () => import("./events-page"),
     exports: ["EventsPage"],
-  },
-  {
-    name: "review-page",
-    load: () => import("./review-page"),
-    exports: ["ReviewHandoffPage"],
   },
   {
     name: "output-page",
@@ -56,7 +46,7 @@ const featureModules = [
 describe("feature page modules", () => {
   for (const { name, load, exports: requiredExports } of featureModules) {
     it(`${name} exports renderable page components`, async () => {
-      const module = await load();
+      const module = (await load()) as Record<string, unknown>;
 
       for (const exportName of requiredExports) {
         expect(module).toHaveProperty(exportName);

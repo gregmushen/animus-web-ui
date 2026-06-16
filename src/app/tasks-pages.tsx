@@ -1,6 +1,6 @@
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useQuery, useMutation } from "@/lib/graphql/client";
+import { useQuery, useMutation, useSubscription } from "@/lib/graphql/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,103 +16,76 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  TasksDocument,
-  TaskDetailDocument,
-  CreateTaskDocument,
-  UpdateTaskDocument,
-  UpdateTaskStatusDocument,
-  DeleteTaskDocument,
-  AssignAgentDocument,
-  AssignHumanDocument,
-  ChecklistAddDocument,
-  ChecklistUpdateDocument,
-  DependencyAddDocument,
-  DependencyRemoveDocument,
+  SubjectsDocument,
+  SubjectDetailDocument,
+  CreateSubjectDocument,
+  SetSubjectStatusDocument,
+  UpdateSubjectDocument,
   RunWorkflowDocument,
-  SetDeadlineDocument,
+  SubjectChangedDocument,
+  SubjectStatus,
 } from "@/lib/graphql/generated/graphql";
-import { toast } from "sonner";
+import type {
+  SubjectsQuery,
+  SubjectDetailQuery,
+  SubjectChangedSubscription,
+} from "@/lib/graphql/generated/graphql";
 import { statusColor, priorityColor, PageLoading, PageError, SectionHeading, Markdown } from "./shared";
 
-export function TasksPage() {
+const PRIORITY_LABELS = ["none", "low", "medium", "high", "critical"];
+
+function priorityLabel(p: number | null | undefined): string {
+  return PRIORITY_LABELS[p ?? 0] ?? "none";
+}
+
+const STATUS_OPTIONS: SubjectStatus[] = [
+  SubjectStatus.Ready,
+  SubjectStatus.InProgress,
+  SubjectStatus.Blocked,
+  SubjectStatus.Done,
+  SubjectStatus.Cancelled,
+];
+
+export function TasksPage({ kind = "task" }: { kind?: string } = {}) {
+  const heading = kind === "requirement" ? "Requirements" : "Tasks";
+  const noun = kind === "requirement" ? "requirements" : "tasks";
+
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = searchParams.get("status") ?? "";
   const searchQuery = searchParams.get("search") ?? "";
-  const [page, setPage] = useState(0);
-  const [pageSize] = useState(25);
-  const [sortBy, setSortBy] = useState("id");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkStatus, setBulkStatus] = useState("");
 
-  const [result] = useQuery({
-    query: TasksDocument,
-    variables: { status: statusFilter || undefined, search: searchQuery || undefined },
+  const statusVar = STATUS_OPTIONS.find((s) => s === statusFilter);
+
+  const [result, reexecute] = useQuery<SubjectsQuery>({
+    query: SubjectsDocument,
+    variables: { kind, status: statusVar },
   });
-  const [, updateStatus] = useMutation(UpdateTaskStatusDocument);
-  const [, runWorkflow] = useMutation(RunWorkflowDocument);
   const { data, fetching, error } = result;
 
-  const tasks = data?.tasks ?? [];
-  const stats = data?.taskStats;
-  const byStatus: Record<string, number> = stats?.byStatus ? JSON.parse(stats.byStatus) : {};
+  // Live subject list: refetch when the daemon reports a subject change for
+  // this kind over the `subjectChanged` graphql-ws subscription. `reexecute`
+  // is recreated each render, so we hold it in a ref and key the effect on the
+  // change event's stable timestamp+id — firing once per websocket message.
+  const [{ data: lastChange }] = useSubscription<
+    SubjectChangedSubscription,
+    SubjectChangedSubscription["subjectChanged"] | undefined
+  >({ query: SubjectChangedDocument, variables: { kind } }, (_prev, next) => next?.subjectChanged);
+  const reexecuteRef = useRef(reexecute);
+  useEffect(() => {
+    reexecuteRef.current = reexecute;
+  }, [reexecute]);
+  const lastChangeKey = lastChange ? `${lastChange.at}:${lastChange.subjectId}:${lastChange.change}` : null;
+  useEffect(() => {
+    if (lastChangeKey) reexecuteRef.current();
+  }, [lastChangeKey]);
 
-  const sortedTasks = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortBy] ?? "";
-      const bVal = (b as Record<string, unknown>)[sortBy] ?? "";
-      const cmp = String(aVal).localeCompare(String(bVal));
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return sorted;
-  }, [tasks, sortBy, sortDir]);
+  const subjects = data?.subject ?? [];
 
-  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / pageSize));
-  const paginatedTasks = useMemo(
-    () => sortedTasks.slice(page * pageSize, (page + 1) * pageSize),
-    [sortedTasks, page, pageSize],
-  );
-
-  const toggleSort = (col: string) => {
-    if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortBy(col); setSortDir("asc"); }
-  };
-
-  const sortArrow = (col: string) => (sortBy === col ? (sortDir === "asc" ? " \u2191" : " \u2193") : "");
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    if (selectedIds.size === paginatedTasks.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(paginatedTasks.map((t) => t.id)));
-  };
-
-  const applyBulkStatus = async () => {
-    if (!bulkStatus || selectedIds.size === 0) return;
-    for (const id of selectedIds) {
-      const { error: err } = await updateStatus({ id, status: bulkStatus });
-      if (err) { toast.error(`Failed ${id}: ${err.message}`); return; }
-    }
-    toast.success(`Updated ${selectedIds.size} tasks to ${bulkStatus}`);
-    setSelectedIds(new Set());
-    setBulkStatus("");
-  };
-
-  const dispatchBulkWorkflows = async () => {
-    if (selectedIds.size === 0) return;
-    for (const id of selectedIds) {
-      const { error: err } = await runWorkflow({ taskId: id });
-      if (err) { toast.error(`Failed ${id}: ${err.message}`); return; }
-    }
-    toast.success(`Dispatched workflows for ${selectedIds.size} tasks`);
-    setSelectedIds(new Set());
-  };
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return subjects;
+    return subjects.filter((s) => s.title.toLowerCase().includes(q));
+  }, [subjects, searchQuery]);
 
   if (fetching) return <PageLoading />;
   if (error) return <PageError message={error.message} />;
@@ -121,14 +94,14 @@ export function TasksPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-          <Link to="/tasks/new"><Button size="sm">Create Task</Button></Link>
+          <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+          <Link to="/tasks/new"><Button size="sm">Create</Button></Link>
         </div>
-        <span className="text-sm text-muted-foreground">{tasks.length} tasks</span>
+        <span className="text-sm text-muted-foreground">{filtered.length} {noun}</span>
       </div>
 
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {["backlog", "ready", "in-progress", "blocked", "done", "cancelled"].map((s) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        {STATUS_OPTIONS.map((s) => (
           <button
             key={s}
             type="button"
@@ -137,96 +110,57 @@ export function TasksPage() {
               if (statusFilter === s) next.delete("status");
               else next.set("status", s);
               setSearchParams(next);
-              setPage(0);
             }}
             className={`rounded-md border px-2 py-1 text-xs text-center transition-colors ${
               statusFilter === s ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
             }`}
           >
-            {s} ({byStatus[s] ?? 0})
+            {s.toLowerCase().replace(/_/g, "-")}
           </button>
         ))}
       </div>
 
       <Input
-        placeholder="Search tasks..."
+        placeholder={`Search ${noun}...`}
         value={searchQuery}
         onChange={(e) => {
           const next = new URLSearchParams(searchParams);
           if (e.target.value) next.set("search", e.target.value);
           else next.delete("search");
           setSearchParams(next);
-          setPage(0);
         }}
         className="max-w-sm"
       />
 
-      {selectedIds.size > 0 && (
-        <div className="border border-primary/20 bg-primary/5 rounded-md px-3 py-2 flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
-          <select
-            value={bulkStatus}
-            onChange={(e) => setBulkStatus(e.target.value)}
-            className="h-6 rounded-md border border-input bg-background px-2 text-xs"
-          >
-            <option value="">Set status...</option>
-            {["backlog", "ready", "in-progress", "blocked", "done", "cancelled"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={applyBulkStatus} disabled={!bulkStatus}>Apply</Button>
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={dispatchBulkWorkflows}>Run Workflows</Button>
-          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setSelectedIds(new Set())}>Clear</Button>
-        </div>
-      )}
-
-      {tasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No tasks match filters.</p>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">No {noun} match filters.</p>
       ) : (
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <input type="checkbox" className="h-4 w-4" checked={selectedIds.size === paginatedTasks.length && paginatedTasks.length > 0} onChange={toggleAll} />
-                </TableHead>
-                <TableHead className="w-28 cursor-pointer select-none" onClick={() => toggleSort("id")}>ID{sortArrow("id")}</TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("title")}>Title{sortArrow("title")}</TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("statusRaw")}>Status{sortArrow("statusRaw")}</TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("priorityRaw")}>Priority{sortArrow("priorityRaw")}</TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("taskTypeRaw")}>Type{sortArrow("taskTypeRaw")}</TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("deadline")}>Deadline{sortArrow("deadline")}</TableHead>
+                <TableHead className="w-28">ID</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Assignee</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedTasks.map((t) => (
-                <TableRow key={t.id}>
+              {filtered.map((s) => (
+                <TableRow key={s.id}>
                   <TableCell>
-                    <input type="checkbox" className="h-4 w-4" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} />
+                    <Link to={`/tasks/${s.id}`} className="font-mono text-xs underline">{s.id}</Link>
                   </TableCell>
-                  <TableCell>
-                    <Link to={`/tasks/${t.id}`} className="font-mono text-xs underline">{t.id}</Link>
-                  </TableCell>
-                  <TableCell className="font-medium">{t.title}</TableCell>
-                  <TableCell><Badge variant={statusColor(t.statusRaw ?? "")}>{t.statusRaw}</Badge></TableCell>
-                  <TableCell><Badge variant={priorityColor(t.priorityRaw ?? "")}>{t.priorityRaw}</Badge></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{t.taskTypeRaw}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{t.deadline ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{s.title}</TableCell>
+                  <TableCell><Badge variant={statusColor(s.status)}>{s.status.toLowerCase().replace(/_/g, "-")}</Badge></TableCell>
+                  <TableCell><Badge variant={priorityColor(priorityLabel(s.priority))}>{priorityLabel(s.priority)}</Badge></TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{s.assignee ?? "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
-      )}
-
-      {sortedTasks.length > pageSize && (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" className="h-6" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Prev</Button>
-            <Button size="sm" variant="outline" className="h-6" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Next</Button>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -234,11 +168,11 @@ export function TasksPage() {
 
 export function TaskCreatePage() {
   const navigate = useNavigate();
-  const [, createTask] = useMutation(CreateTaskDocument);
+  const [, createSubject] = useMutation(CreateSubjectDocument);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("medium");
-  const [taskType, setTaskType] = useState("feature");
+  const [priority, setPriority] = useState(2);
+  const [kind, setKind] = useState("task");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -247,23 +181,25 @@ export function TaskCreatePage() {
     if (!title.trim()) { setErrorMsg("Title is required."); return; }
     setSubmitting(true);
     setErrorMsg(null);
-    const result = await createTask({
-      title: title.trim(),
-      description: description.trim() || null,
-      priority,
-      taskType,
+    const result = await createSubject({
+      input: {
+        kind: kind.trim() || "task",
+        title: title.trim(),
+        body: description.trim() || undefined,
+        priority,
+      },
     });
     setSubmitting(false);
     if (result.error) {
       setErrorMsg(result.error.message);
     } else {
-      navigate(`/tasks/${result.data?.createTask?.id}`, { replace: true });
+      navigate(`/tasks/${result.data?.createSubject?.id}`, { replace: true });
     }
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Create Task</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Create Subject</h1>
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={onSubmit} className="space-y-4">
@@ -278,19 +214,27 @@ export function TaskCreatePage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Priority</label>
-                <select value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["critical", "high", "medium", "low"].map((p) => <option key={p} value={p}>{p}</option>)}
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(Number(e.target.value))}
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {PRIORITY_LABELS.map((label, i) => <option key={i} value={i}>{label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium">Type</label>
-                <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["feature", "bug", "chore", "refactor", "test", "docs"].map((t) => <option key={t} value={t}>{t}</option>)}
+                <label className="text-sm font-medium">Kind</label>
+                <select
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {["task", "requirement"].map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button type="submit" disabled={submitting}>{submitting ? "Creating..." : "Create Task"}</Button>
+              <Button type="submit" disabled={submitting}>{submitting ? "Creating..." : "Create"}</Button>
               <Link to="/tasks"><Button variant="outline" type="button">Cancel</Button></Link>
             </div>
           </form>
@@ -302,37 +246,20 @@ export function TaskCreatePage() {
 }
 
 export function TaskDetailPage() {
-  const navigate = useNavigate();
   const { taskId } = useParams();
-  const [result, reexecute] = useQuery({ query: TaskDetailDocument, variables: { id: taskId! } });
-  const [, updateStatus] = useMutation(UpdateTaskStatusDocument);
-  const [, updateTask] = useMutation(UpdateTaskDocument);
-  const [, deleteTask] = useMutation(DeleteTaskDocument);
-  const [, assignAgent] = useMutation(AssignAgentDocument);
-  const [, assignHuman] = useMutation(AssignHumanDocument);
-  const [, checklistAdd] = useMutation(ChecklistAddDocument);
-  const [, checklistUpdate] = useMutation(ChecklistUpdateDocument);
-  const [, depAdd] = useMutation(DependencyAddDocument);
-  const [, depRemove] = useMutation(DependencyRemoveDocument);
-  const [, setDeadline] = useMutation(SetDeadlineDocument);
+  const [result, reexecute] = useQuery<SubjectDetailQuery>({
+    query: SubjectDetailDocument,
+    variables: { id: taskId! },
+  });
+  const [, setStatus] = useMutation(SetSubjectStatusDocument);
+  const [, updateSubject] = useMutation(UpdateSubjectDocument);
+  const [, runWorkflow] = useMutation(RunWorkflowDocument);
 
-  const [targetStatus, setTargetStatus] = useState("");
+  const [targetStatus, setTargetStatus] = useState<SubjectStatus | "">("");
+  const [assigneeDraft, setAssigneeDraft] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDesc, setEditDesc] = useState("");
-  const [editPriority, setEditPriority] = useState("");
-  const [editType, setEditType] = useState("");
-  const [editRisk, setEditRisk] = useState("");
-  const [editScope, setEditScope] = useState("");
-  const [editComplexity, setEditComplexity] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [newChecklistItem, setNewChecklistItem] = useState("");
-  const [newDepId, setNewDepId] = useState("");
-  const [assignMode, setAssignMode] = useState<"" | "agent" | "human">("");
-  const [assignRole, setAssignRole] = useState("default");
-  const [assignModel, setAssignModel] = useState("");
-  const [assignName, setAssignName] = useState("");
 
   const { data, fetching, error } = result;
 
@@ -343,115 +270,72 @@ export function TaskDetailPage() {
   if (fetching) return <PageLoading />;
   if (error) return <PageError message={error.message} />;
 
-  const task = data?.task;
-  if (!task) return <PageError message={`Task ${taskId} not found.`} />;
-
-  const startEdit = () => {
-    setEditTitle(task.title);
-    setEditDesc(task.description ?? "");
-    setEditPriority(task.priorityRaw ?? "");
-    setEditType(task.taskTypeRaw ?? "");
-    setEditRisk(task.risk ?? "");
-    setEditScope(task.scope ?? "");
-    setEditComplexity(task.complexity ?? "");
-    setEditing(true);
-  };
-
-  const saveEdit = async () => {
-    const { error: err } = await updateTask({
-      id: taskId!,
-      title: editTitle.trim() || null,
-      description: editDesc.trim() || null,
-      taskType: editType || null,
-      priority: editPriority || null,
-      risk: editRisk || null,
-      scope: editScope || null,
-      complexity: editComplexity || null,
-    });
-    if (err) showFeedback("error", err.message);
-    else { showFeedback("ok", "Task updated."); setEditing(false); reload(); }
-  };
+  const subject = data?.subjectById;
+  if (!subject) return <PageError message={`Subject ${taskId} not found.`} />;
 
   const applyStatus = async () => {
     if (!targetStatus) return;
-    const { error: err } = await updateStatus({ id: taskId!, status: targetStatus });
+    const { error: err } = await setStatus({ id: taskId!, status: targetStatus });
     if (err) showFeedback("error", err.message);
     else { showFeedback("ok", `Status updated to ${targetStatus}.`); reload(); }
   };
 
-  const onDelete = async () => {
-    const { error: err } = await deleteTask({ id: taskId! });
+  const onRunWorkflow = async () => {
+    const { error: err } = await runWorkflow({ taskId: subject.id });
     if (err) showFeedback("error", err.message);
-    else navigate("/tasks", { replace: true });
+    else showFeedback("ok", "Workflow dispatched.");
   };
 
-  const onChecklistToggle = async (itemId: string, completed: boolean) => {
-    const { error: err } = await checklistUpdate({ id: taskId!, itemId, completed: !completed });
+  // `assigneeDraft === null` means "not editing"; track the current value
+  // against the live subject so we only send a change when it actually differs.
+  const currentAssignee = subject.assignee ?? "";
+  const assigneeValue = assigneeDraft ?? currentAssignee;
+
+  const saveAssignee = async () => {
+    const next = (assigneeDraft ?? currentAssignee).trim();
+    if (next === currentAssignee.trim()) { setAssigneeDraft(null); return; }
+    setSavingEdit(true);
+    // Empty string clears the assignee (per schema contract).
+    const { error: err } = await updateSubject({ input: { id: taskId!, assignee: next } });
+    setSavingEdit(false);
     if (err) showFeedback("error", err.message);
-    else reload();
+    else { showFeedback("ok", next ? `Assignee set to ${next}.` : "Assignee cleared."); setAssigneeDraft(null); reload(); }
   };
 
-  const onChecklistAdd = async () => {
-    if (!newChecklistItem.trim()) return;
-    const { error: err } = await checklistAdd({ id: taskId!, description: newChecklistItem.trim() });
+  const addLabel = async () => {
+    const label = newLabel.trim();
+    if (!label || subject.labels.includes(label)) { setNewLabel(""); return; }
+    setSavingEdit(true);
+    const { error: err } = await updateSubject({ input: { id: taskId!, labelsAdd: [label] } });
+    setSavingEdit(false);
     if (err) showFeedback("error", err.message);
-    else { setNewChecklistItem(""); reload(); }
+    else { showFeedback("ok", `Label "${label}" added.`); setNewLabel(""); reload(); }
   };
 
-  const onDepAdd = async () => {
-    if (!newDepId.trim()) return;
-    const { error: err } = await depAdd({ id: taskId!, dependsOn: newDepId.trim() });
+  const removeLabel = async (label: string) => {
+    setSavingEdit(true);
+    const { error: err } = await updateSubject({ input: { id: taskId!, labelsRemove: [label] } });
+    setSavingEdit(false);
     if (err) showFeedback("error", err.message);
-    else { setNewDepId(""); reload(); }
-  };
-
-  const onDepRemove = async (depTaskId: string) => {
-    const { error: err } = await depRemove({ id: taskId!, dependsOn: depTaskId });
-    if (err) showFeedback("error", err.message);
-    else reload();
-  };
-
-  const onDeadlineChange = async (value: string) => {
-    const { error: err } = await setDeadline({ id: taskId!, deadline: value || null });
-    if (err) showFeedback("error", err.message);
-    else { showFeedback("ok", value ? `Deadline set to ${value}.` : "Deadline cleared."); reload(); }
-  };
-
-  const onAssign = async () => {
-    if (assignMode === "agent") {
-      const { error: err } = await assignAgent({ id: taskId!, role: assignRole || null, model: assignModel || null });
-      if (err) showFeedback("error", err.message);
-      else { showFeedback("ok", "Assigned to agent."); setAssignMode(""); reload(); }
-    } else if (assignMode === "human") {
-      if (!assignName.trim()) return;
-      const { error: err } = await assignHuman({ id: taskId!, name: assignName.trim() });
-      if (err) showFeedback("error", err.message);
-      else { showFeedback("ok", `Assigned to ${assignName}.`); setAssignMode(""); reload(); }
-    }
+    else { showFeedback("ok", `Label "${label}" removed.`); reload(); }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[11px] text-muted-foreground/50 font-mono tracking-wide">{task.id}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{task.title}</h1>
-          <div className="flex gap-2 mt-2">
-            <Badge variant={statusColor(task.statusRaw ?? "")}>{task.statusRaw}</Badge>
-            <Badge variant={priorityColor(task.priorityRaw ?? "")}>{task.priorityRaw}</Badge>
-            <Badge variant="outline">{task.taskTypeRaw}</Badge>
+          <p className="text-[11px] text-muted-foreground/50 font-mono tracking-wide">{subject.id}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{subject.title}</h1>
+          <div className="flex gap-2 mt-2 flex-wrap items-center">
+            <Badge variant={statusColor(subject.status)}>{subject.status.toLowerCase().replace(/_/g, "-")}</Badge>
+            {subject.nativeStatus && <Badge variant="outline">{subject.nativeStatus}</Badge>}
+            <Badge variant={priorityColor(priorityLabel(subject.priority))}>{priorityLabel(subject.priority)}</Badge>
+            <Badge variant="outline">{subject.kind}</Badge>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={startEdit}>Edit</Button>
-          {confirmDelete ? (
-            <>
-              <Button size="sm" variant="destructive" onClick={onDelete}>Confirm Delete</Button>
-              <Button size="sm" variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-            </>
-          ) : (
-            <Button size="sm" variant="ghost" className="text-destructive/60 hover:text-destructive" onClick={() => setConfirmDelete(true)}>Delete</Button>
-          )}
+          <Button size="sm" variant="outline" onClick={onRunWorkflow}>Run Workflow</Button>
+          <Link to={`/tasks/${subject.id}/output`}><Button size="sm" variant="outline">Output</Button></Link>
         </div>
       </div>
 
@@ -461,57 +345,9 @@ export function TaskDetailPage() {
         </Alert>
       )}
 
-      {editing && (
-        <Card className="border-primary/20 bg-card/60">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Edit Task</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3 space-y-3">
-            <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Title</label>
-              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Description</label>
-              <Textarea rows={3} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="mt-1" />
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Priority</label>
-                <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["critical", "high", "medium", "low"].map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Type</label>
-                <select value={editType} onChange={(e) => setEditType(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["feature", "bug", "chore", "refactor", "test", "docs"].map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Risk</label>
-                <select value={editRisk} onChange={(e) => setEditRisk(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["low", "medium", "high"].map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium">Scope</label>
-                <select value={editScope} onChange={(e) => setEditScope(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  {["small", "medium", "large"].map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={saveEdit}>Save</Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {task.description && !editing && (
+      {subject.description && (
         <Card className="border-border/40 bg-card/60">
-          <CardContent className="pt-4 pb-3 px-4"><Markdown content={task.description} /></CardContent>
+          <CardContent className="pt-4 pb-3 px-4"><Markdown content={subject.description} /></CardContent>
         </Card>
       )}
 
@@ -524,187 +360,175 @@ export function TaskDetailPage() {
             <div className="flex items-center gap-2">
               <select
                 value={targetStatus}
-                onChange={(e) => setTargetStatus(e.target.value)}
+                onChange={(e) => setTargetStatus(e.target.value as SubjectStatus)}
                 className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">Select status...</option>
-                {["backlog", "ready", "in-progress", "blocked", "on-hold", "done", "cancelled"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s.toLowerCase().replace(/_/g, "-")}</option>
                 ))}
               </select>
-              <Button size="sm" onClick={applyStatus} disabled={!targetStatus || targetStatus === task.statusRaw}>
+              <Button size="sm" onClick={applyStatus} disabled={!targetStatus || targetStatus === subject.status}>
                 Apply
               </Button>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border/30 space-y-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1">Assignee</div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={assigneeValue}
+                    placeholder="unassigned"
+                    onChange={(e) => setAssigneeDraft(e.target.value)}
+                    className="h-9 flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={saveAssignee}
+                    disabled={savingEdit || (assigneeValue.trim() === currentAssignee.trim())}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium mb-1">Labels</div>
+                <div className="flex gap-1 flex-wrap mb-2">
+                  {subject.labels.length === 0 && <span className="text-xs text-muted-foreground/50">none</span>}
+                  {subject.labels.map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => removeLabel(l)}
+                      className="group inline-flex items-center gap-1 rounded-md border border-border/40 px-2 py-0.5 text-[10px] hover:bg-destructive/10 hover:border-destructive/40 transition-colors disabled:opacity-50"
+                      title="Remove label"
+                    >
+                      {l}<span className="text-muted-foreground/50 group-hover:text-destructive">×</span>
+                    </button>
+                  ))}
+                </div>
+                <form
+                  onSubmit={(e) => { e.preventDefault(); void addLabel(); }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    value={newLabel}
+                    placeholder="Add label..."
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    className="h-9 flex-1"
+                  />
+                  <Button type="submit" size="sm" variant="outline" disabled={savingEdit || !newLabel.trim()}>
+                    Add
+                  </Button>
+                </form>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/40 bg-card/60 min-w-[180px]">
+        <Card className="border-border/40 bg-card/60 min-w-[200px]">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Details</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-3 space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground/60">Deadline</span>
-              <input
-                type="date"
-                value={task.deadline ?? ""}
-                onChange={(e) => onDeadlineChange(e.target.value)}
-                className="h-6 rounded border border-input bg-background px-2 text-xs"
-              />
+              <span className="text-muted-foreground/60">Assignee</span>
+              <span>{subject.assignee ?? "—"}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground/60">Risk</span>
-              <Badge variant="outline" className="text-[10px]">{task.risk}</Badge>
+              <span className="text-muted-foreground/60">Created</span>
+              <span className="font-mono">{subject.createdAt}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground/60">Scope</span>
-              <Badge variant="outline" className="text-[10px]">{task.scope}</Badge>
+              <span className="text-muted-foreground/60">Updated</span>
+              <span className="font-mono">{subject.updatedAt}</span>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground/60">Complexity</span>
-              <Badge variant="outline" className="text-[10px]">{task.complexity}</Badge>
-            </div>
-            {(task.tags ?? []).length > 0 && (
+            {subject.parent && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground/60">Parent</span>
+                <Link to={`/tasks/${subject.parent}`} className="font-mono text-primary/80 hover:text-primary">{subject.parent}</Link>
+              </div>
+            )}
+            {subject.url && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground/60">URL</span>
+                <a href={subject.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate max-w-[120px]">{subject.url}</a>
+              </div>
+            )}
+            {subject.labels.length > 0 && (
               <div className="flex gap-1 flex-wrap pt-1">
-                {task.tags!.map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}
+                {subject.labels.map((l) => <Badge key={l} variant="outline" className="text-[10px]">{l}</Badge>)}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <SectionHeading>Work</SectionHeading>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="border-border/40 bg-card/60">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Assignment</CardTitle>
-              {assignMode === "" && (
-                <div className="flex gap-1">
-                  <Button size="sm" variant="outline" className="h-5 text-[10px] px-1.5" onClick={() => setAssignMode("agent")}>Agent</Button>
-                  <Button size="sm" variant="outline" className="h-5 text-[10px] px-1.5" onClick={() => setAssignMode("human")}>Human</Button>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            {assignMode === "agent" && (
-              <div className="flex items-end gap-2">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">Role</label>
-                  <Input value={assignRole} onChange={(e) => setAssignRole(e.target.value)} className="mt-1 h-8 w-32 text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">Model</label>
-                  <Input value={assignModel} onChange={(e) => setAssignModel(e.target.value)} placeholder="e.g. claude-sonnet-4-6" className="mt-1 h-8 w-48 text-xs" />
-                </div>
-                <Button size="sm" className="h-8" onClick={onAssign}>Assign</Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => setAssignMode("")}>Cancel</Button>
-              </div>
-            )}
-            {assignMode === "human" && (
-              <div className="flex items-end gap-2">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">Name</label>
-                  <Input value={assignName} onChange={(e) => setAssignName(e.target.value)} className="mt-1 h-8 w-48 text-xs" />
-                </div>
-                <Button size="sm" className="h-8" onClick={onAssign}>Assign</Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => setAssignMode("")}>Cancel</Button>
-              </div>
-            )}
-            {assignMode === "" && (
-              <p className="text-xs text-muted-foreground/50">Unassigned</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/40 bg-card/60">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Checklist</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3 space-y-2">
-            {(task.checklist ?? []).length > 0 && (
-              <ul className="space-y-1">
-                {task.checklist!.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 text-sm">
-                    <button
-                      type="button"
-                      onClick={() => onChecklistToggle(item.id, item.completed)}
-                      className="shrink-0 text-lg leading-none hover:opacity-70"
-                      aria-label={item.completed ? `Uncheck: ${item.description}` : `Check: ${item.description}`}
-                    >
-                      {item.completed ? <span className="text-[var(--ao-success)]">&#x2611;</span> : <span className="text-muted-foreground">&#x2610;</span>}
-                    </button>
-                    <span className={item.completed ? "line-through text-muted-foreground" : ""}>{item.description}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <Input
-                value={newChecklistItem}
-                onChange={(e) => setNewChecklistItem(e.target.value)}
-                placeholder="Add checklist item..."
-                className="h-8 text-sm"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onChecklistAdd())}
-              />
-              <Button size="sm" variant="outline" className="h-8" onClick={onChecklistAdd}>Add</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <SectionHeading>Relationships</SectionHeading>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="border-border/40 bg-card/60">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Dependencies</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3 space-y-2">
-            {(task.dependencies ?? []).length > 0 && (
-              <ul className="space-y-1">
-                {task.dependencies!.map((dep) => (
-                  <li key={dep.taskId} className="flex items-center gap-2 text-sm">
-                    <Link to={`/tasks/${dep.taskId}`} className="font-mono text-xs text-primary/80 hover:text-primary transition-colors">{dep.taskId}</Link>
-                    <span className="text-muted-foreground/50 text-xs">{dep.type}</span>
-                    <Button size="sm" variant="ghost" className="h-5 px-1 text-[10px] text-destructive/60 hover:text-destructive" onClick={() => onDepRemove(dep.taskId)}>remove</Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <Input
-                value={newDepId}
-                onChange={(e) => setNewDepId(e.target.value)}
-                placeholder="TASK-XXX"
-                className="h-8 w-40 text-sm font-mono"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onDepAdd())}
-              />
-              <Button size="sm" variant="outline" className="h-8" onClick={onDepAdd}>Add</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {(task.linkedRequirementIds ?? []).length > 0 && (
+      {subject.children.length > 0 && (
+        <>
+          <SectionHeading>Children</SectionHeading>
           <Card className="border-border/40 bg-card/60">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Linked Requirements</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
+            <CardContent className="px-4 py-3">
               <div className="flex gap-2 flex-wrap">
-                {task.linkedRequirementIds!.map((id) => (
-                  <Link key={id} to={`/planning/requirements/${id}`}>
-                    <Badge variant="outline" className="font-mono text-[10px] hover:bg-accent/50 transition-colors cursor-pointer">{id}</Badge>
+                {subject.children.map((c) => (
+                  <Link key={c} to={`/tasks/${c}`}>
+                    <Badge variant="outline" className="font-mono text-[10px] hover:bg-accent/50 transition-colors cursor-pointer">{c}</Badge>
                   </Link>
                 ))}
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </>
+      )}
+
+      {subject.attachments.length > 0 && (
+        <>
+          <SectionHeading>Attachments</SectionHeading>
+          <Card className="border-border/40 bg-card/60">
+            <CardContent className="px-4 py-3 space-y-1.5">
+              {subject.attachments.map((a) => (
+                <div key={a.id} className="flex items-center gap-2 text-xs">
+                  <Badge variant="outline" className="text-[10px]">{a.kind}</Badge>
+                  <a href={a.uri} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {a.title ?? a.uri}
+                  </a>
+                  {a.mimeType && <span className="text-muted-foreground/50">{a.mimeType}</span>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {(subject.statusMetadata || subject.custom) && (
+        <>
+          <SectionHeading>Metadata</SectionHeading>
+          {subject.statusMetadata && (
+            <Card className="border-border/40 bg-card/60">
+              <CardHeader className="pb-1 pt-3 px-4">
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Status Metadata</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3">
+                <pre className="overflow-x-auto rounded-md bg-muted/50 border border-border/30 p-3 text-[11px] font-mono text-foreground/80">{subject.statusMetadata}</pre>
+              </CardContent>
+            </Card>
+          )}
+          {subject.custom && (
+            <Card className="border-border/40 bg-card/60">
+              <CardHeader className="pb-1 pt-3 px-4">
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">Custom</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3">
+                <pre className="overflow-x-auto rounded-md bg-muted/50 border border-border/30 p-3 text-[11px] font-mono text-foreground/80">{subject.custom}</pre>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
     </div>
   );
 }

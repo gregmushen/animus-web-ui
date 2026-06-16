@@ -1,8 +1,43 @@
-query Queue {
-  queue { taskId title priority status waitTime position }
-  queueStats { depth readyCount heldCount avgWait throughput }
+query Queue($state: QueueState) {
+  queue(state: $state) {
+    id
+    taskId
+    priority
+    state
+    enqueuedAt
+    held
+    holdReason
+  }
+  queueStats {
+    total
+    ready
+    held
+    inFlight
+    doneRecent
+    droppedRecent
+  }
 }
 
-mutation QueueHold($taskId: String!, $reason: String) { queueHold(taskId: $taskId, reason: $reason) }
-mutation QueueRelease($taskId: String!) { queueRelease(taskId: $taskId) }
-mutation QueueReorder($taskIds: [String!]!) { queueReorder(taskIds: $taskIds) }
+mutation Enqueue($input: EnqueueInput!) {
+  enqueue(input: $input) {
+    id
+    taskId
+    state
+  }
+}
+
+mutation HoldQueue($id: ID!, $reason: String) {
+  holdQueue(id: $id, reason: $reason)
+}
+
+mutation ReleaseQueue($id: ID!) {
+  releaseQueue(id: $id)
+}
+
+mutation DropQueue($id: ID!) {
+  dropQueue(id: $id)
+}
+
+mutation ReorderQueue($ids: [ID!]!, $front: Boolean) {
+  reorderQueue(ids: $ids, front: $front)
+}

@@ -12,34 +12,37 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DashboardDocument } from "@/lib/graphql/generated/graphql";
-import { statusColor, StatusDot, PageLoading, PageError, StatCard } from "./shared";
+import type { DashboardQuery } from "@/lib/graphql/generated/graphql";
+import { StatusDot, PageLoading, PageError, StatCard } from "./shared";
 
 export function DashboardPage() {
-  const [result] = useQuery({ query: DashboardDocument });
+  const [result] = useQuery<DashboardQuery>({ query: DashboardDocument });
   const { data, fetching, error } = result;
 
   if (fetching) return <PageLoading />;
   if (error) return <PageError message={error.message} />;
 
-  const stats = data?.taskStats;
+  const subjects = data?.subject ?? [];
   const health = data?.daemonHealth;
-  const agents = data?.agentRuns ?? [];
-  const sys = data?.systemInfo;
+  const agents = data?.daemonAgents ?? [];
+  const daemon = data?.daemon;
+  const queue = data?.queueStats;
+  const plugins = health?.plugins ?? [];
 
-  const byStatus: Record<string, number> = stats?.byStatus ? JSON.parse(stats.byStatus) : {};
-  const byPriority: Record<string, number> = stats?.byPriority ? JSON.parse(stats.byPriority) : {};
-  const inProgress = byStatus["in-progress"] ?? 0;
-  const blocked = byStatus["blocked"] ?? 0;
-  const failed = byStatus["failed"] ?? 0;
-  const ready = byStatus["ready"] ?? 0;
+  const countStatus = (s: string) => subjects.filter((t) => t.status === s).length;
+  const total = subjects.length;
+  const inProgress = countStatus("IN_PROGRESS");
+  const blocked = countStatus("BLOCKED");
+  const ready = countStatus("READY");
 
-  const priorityCritical = byPriority["critical"] ?? 0;
-  const priorityHigh = byPriority["high"] ?? 0;
-  const priorityMedium = byPriority["medium"] ?? 0;
-  const priorityLow = byPriority["low"] ?? 0;
+  // Priority is a 0..4 Int. 3=high, 4=critical.
+  const priorityCritical = subjects.filter((t) => t.priority === 4).length;
+  const priorityHigh = subjects.filter((t) => t.priority === 3).length;
+  const priorityMedium = subjects.filter((t) => t.priority === 2).length;
+  const priorityLow = subjects.filter((t) => (t.priority ?? 0) <= 1).length;
   const priorityTotal = priorityCritical + priorityHigh + priorityMedium + priorityLow;
 
-  const needsAttention = blocked > 0 || failed > 0;
+  const needsAttention = blocked > 0;
 
   return (
     <div className="space-y-6">
@@ -54,24 +57,21 @@ export function DashboardPage() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground/60 mt-0.5 font-mono">
-              {sys?.projectRoot ?? "no project loaded"}
+              {daemon?.projectRoot ?? "no project loaded"}
             </p>
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/tasks/new">New Task</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/tasks/new" />}>
+          New Task
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/workflows/dispatch/task">Run Workflow</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/workflows/dispatch/task" />}>
+          Run Workflow
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/workflows/builder">Build Workflow</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/queue">View Queue</Link>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/queue" />}>
+          View Queue
         </Button>
       </div>
 
@@ -80,28 +80,20 @@ export function DashboardPage() {
           <CardContent className="pt-3 pb-3 px-4">
             <p className="text-xs uppercase tracking-wider text-amber-500/80 font-medium mb-2">Attention Required</p>
             <div className="space-y-1">
-              {blocked > 0 && (
-                <Link to="/tasks?status=blocked" className="flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground transition-colors">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  <span>{blocked} task{blocked !== 1 ? "s" : ""} blocked</span>
-                </Link>
-              )}
-              {failed > 0 && (
-                <Link to="/tasks?status=failed" className="flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground transition-colors">
-                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                  <span>{failed} task{failed !== 1 ? "s" : ""} failed</span>
-                </Link>
-              )}
+              <Link to="/tasks?status=BLOCKED" className="flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground transition-colors">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span>{blocked} task{blocked !== 1 ? "s" : ""} blocked</span>
+              </Link>
             </div>
           </CardContent>
         </Card>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Total" value={stats?.total ?? 0} />
+        <StatCard label="Total" value={total} />
         <StatCard label="In Progress" value={inProgress} accent={inProgress > 0} />
         <StatCard label="Ready" value={ready} />
-        <StatCard label="Blocked" value={blocked} />
+        <StatCard label="Queue" value={queue?.total ?? 0} />
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
@@ -120,31 +112,22 @@ export function DashboardPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border/30 hover:bg-transparent">
-                      <TableHead className="text-[10px] uppercase tracking-wider h-7">Run</TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-wider h-7">Task</TableHead>
+                      <TableHead className="text-[10px] uppercase tracking-wider h-7">Session</TableHead>
+                      <TableHead className="text-[10px] uppercase tracking-wider h-7">Provider</TableHead>
                       <TableHead className="text-[10px] uppercase tracking-wider h-7">Phase</TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-wider h-7">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {agents.map((a) => (
-                      <TableRow key={a.runId} className="border-border/20 hover:bg-accent/30">
-                        <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.runId}</TableCell>
-                        <TableCell className="py-2">
-                          {a.taskId ? (
-                            <Link to={`/tasks/${a.taskId}`} className="text-primary/80 hover:text-primary text-xs transition-colors">
-                              {a.taskTitle ?? a.taskId}
+                      <TableRow key={a.sessionId} className="border-border/20 hover:bg-accent/30">
+                        <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.sessionId}</TableCell>
+                        <TableCell className="text-[11px] py-2">{a.provider} / {a.model}</TableCell>
+                        <TableCell className="font-mono text-[11px] text-muted-foreground py-2">
+                          {a.workflowId ? (
+                            <Link to={`/workflows/${a.workflowId}`} className="text-primary/80 hover:text-primary transition-colors">
+                              {a.phaseId ?? a.workflowId}
                             </Link>
-                          ) : (
-                            <span className="text-muted-foreground/40">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-[11px] text-muted-foreground py-2">{a.phaseId ?? "-"}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-1.5">
-                            <StatusDot status={a.status} />
-                            <span className="text-[11px]">{a.status}</span>
-                          </div>
+                          ) : (a.phaseId ?? "-")}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -174,58 +157,30 @@ export function DashboardPage() {
               <CardContent className="px-4 pb-3">
                 <div className="flex h-2 rounded-full overflow-hidden bg-muted/20">
                   {priorityCritical > 0 && (
-                    <div
-                      className="bg-destructive transition-all"
-                      style={{ width: `${(priorityCritical / priorityTotal) * 100}%` }}
-                      title={`Critical: ${priorityCritical}`}
-                    />
+                    <div className="bg-destructive transition-all" style={{ width: `${(priorityCritical / priorityTotal) * 100}%` }} title={`Critical: ${priorityCritical}`} />
                   )}
                   {priorityHigh > 0 && (
-                    <div
-                      className="bg-[var(--ao-amber)] transition-all"
-                      style={{ width: `${(priorityHigh / priorityTotal) * 100}%` }}
-                      title={`High: ${priorityHigh}`}
-                    />
+                    <div className="bg-[var(--ao-amber)] transition-all" style={{ width: `${(priorityHigh / priorityTotal) * 100}%` }} title={`High: ${priorityHigh}`} />
                   )}
                   {priorityMedium > 0 && (
-                    <div
-                      className="bg-muted-foreground/40 transition-all"
-                      style={{ width: `${(priorityMedium / priorityTotal) * 100}%` }}
-                      title={`Medium: ${priorityMedium}`}
-                    />
+                    <div className="bg-muted-foreground/40 transition-all" style={{ width: `${(priorityMedium / priorityTotal) * 100}%` }} title={`Medium: ${priorityMedium}`} />
                   )}
                   {priorityLow > 0 && (
-                    <div
-                      className="bg-border transition-all"
-                      style={{ width: `${(priorityLow / priorityTotal) * 100}%` }}
-                      title={`Low: ${priorityLow}`}
-                    />
+                    <div className="bg-border transition-all" style={{ width: `${(priorityLow / priorityTotal) * 100}%` }} title={`Low: ${priorityLow}`} />
                   )}
                 </div>
                 <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
                   {priorityCritical > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                      {priorityCritical} critical
-                    </span>
+                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-destructive" />{priorityCritical} critical</span>
                   )}
                   {priorityHigh > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--ao-amber)]" />
-                      {priorityHigh} high
-                    </span>
+                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-[var(--ao-amber)]" />{priorityHigh} high</span>
                   )}
                   {priorityMedium > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                      {priorityMedium} medium
-                    </span>
+                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />{priorityMedium} medium</span>
                   )}
                   {priorityLow > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-border" />
-                      {priorityLow} low
-                    </span>
+                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-border" />{priorityLow} low</span>
                   )}
                 </div>
               </CardContent>
@@ -246,34 +201,26 @@ export function DashboardPage() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Agents</span>
-                  <span className="font-mono text-foreground/70">{health?.activeDaemons ?? 0} active</span>
+                  <span className="font-mono text-foreground/70">{agents.length} active</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Runner</span>
+                  <span className="text-muted-foreground">Daemon</span>
                   <span className="font-mono text-foreground/70">
-                    {health?.runnerConnected ? (
-                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-[var(--ao-success-border)] text-[var(--ao-success)]">connected</Badge>
+                    {daemon?.running ? (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-[var(--ao-success-border)] text-[var(--ao-success)]">running</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border/40 text-muted-foreground/60">disconnected</Badge>
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border/40 text-muted-foreground/60">stopped</Badge>
                     )}
                   </span>
                 </div>
-                {health?.daemonPid && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">PID</span>
-                    <span className="font-mono text-foreground/70">{health.daemonPid}</span>
-                  </div>
-                )}
-                {sys?.version && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Plugins</span>
+                  <span className="font-mono text-foreground/70">{plugins.length}</span>
+                </div>
+                {daemon?.version && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Version</span>
-                    <span className="font-mono text-foreground/70">{sys.version}</span>
-                  </div>
-                )}
-                {sys?.platform && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform</span>
-                    <span className="font-mono text-foreground/70">{sys.platform}</span>
+                    <span className="font-mono text-foreground/70">{daemon.version}</span>
                   </div>
                 )}
               </div>

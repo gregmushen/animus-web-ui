@@ -1,7 +1,34 @@
 query Dashboard {
-  taskStats { total byStatus byPriority }
-  daemonHealth { healthy status runnerConnected activeDaemons: activeAgents daemonPid }
-  agentRuns { runId taskId taskTitle workflowId phaseId status }
-  systemInfo { platform version daemonStatus projectRoot }
-  queueStats { depth }
+  subject(kind: "task") {
+    id
+    status
+    priority
+  }
+  daemon {
+    running
+    version
+    projectRoot
+  }
+  daemonHealth {
+    healthy
+    status
+    plugins {
+      name
+      kind
+      status
+    }
+  }
+  daemonAgents {
+    sessionId
+    provider
+    model
+    workflowId
+    phaseId
+  }
+  queueStats {
+    total
+    ready
+    held
+    inFlight
+  }
 }

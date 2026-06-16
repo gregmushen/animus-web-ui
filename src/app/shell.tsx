@@ -10,12 +10,10 @@ import {
   ListTodo,
   GitBranch,
   Layers,
-  FileText,
   Server,
   Bot,
   Activity,
   ClipboardCheck,
-  Settings,
   Search,
   Menu,
   ChevronRight,
@@ -23,12 +21,11 @@ import {
   Sun,
   Moon,
   Monitor,
-  AlertTriangle,
-  Wrench,
   Share2,
   Clock,
   Map,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -41,45 +38,43 @@ import { Toaster } from "@/components/ui/sonner";
 import { useTheme } from "./theme-provider";
 import { useQuery } from "@/lib/graphql/client";
 import { DashboardDocument } from "@/lib/graphql/generated/graphql";
+import type { DashboardQuery } from "@/lib/graphql/generated/graphql";
 
-export const NAV_GROUPS = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  badgeKey: string | null;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operate",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badgeKey: null },
-      { to: "/tasks", label: "Tasks", icon: ListTodo, badgeKey: "tasks" as const },
-      { to: "/workflows", label: "Workflows", icon: GitBranch, badgeKey: "workflows" as const },
-      { to: "/queue", label: "Queue", icon: Layers, badgeKey: "queue" as const },
-      { to: "/agents", label: "Agents", icon: Bot, badgeKey: "agents" as const },
+      { to: "/tasks", label: "Tasks", icon: ListTodo, badgeKey: "tasks" },
+      { to: "/requirements", label: "Requirements", icon: ClipboardCheck, badgeKey: null },
+      { to: "/workflows", label: "Workflows", icon: GitBranch, badgeKey: "workflows" },
+      { to: "/queue", label: "Queue", icon: Layers, badgeKey: "queue" },
+      { to: "/agents", label: "Agents", icon: Bot, badgeKey: "agents" },
       { to: "/ops-map", label: "Ops Map", icon: Map, badgeKey: null },
-    ],
-  },
-  {
-    label: "Plan",
-    items: [
-      { to: "/planning/vision", label: "Vision", icon: FileText, badgeKey: null },
-      { to: "/planning/requirements", label: "Requirements", icon: ClipboardCheck, badgeKey: null },
-      { to: "/architecture", label: "Architecture", icon: Share2, badgeKey: null },
     ],
   },
   {
     label: "Monitor",
     items: [
-      { to: "/events", label: "Events", icon: Activity, badgeKey: "events" as const },
+      { to: "/events", label: "Events", icon: Activity, badgeKey: "events" },
       { to: "/history", label: "History", icon: Clock, badgeKey: null },
-      { to: "/errors", label: "Errors", icon: AlertTriangle, badgeKey: "errors" as const },
       { to: "/daemon", label: "Daemon", icon: Server, badgeKey: null },
+      { to: "/architecture", label: "Architecture", icon: Share2, badgeKey: null },
     ],
   },
-  {
-    label: "Configure",
-    items: [
-      { to: "/workflows/builder", label: "Builder", icon: Wrench, badgeKey: null },
-      { to: "/skills", label: "Skills", icon: Layers, badgeKey: null },
-      { to: "/settings/mcp", label: "Settings", icon: Settings, badgeKey: null },
-    ],
-  },
-] as const;
+];
 
 export const PRIMARY_NAV_ITEMS = NAV_GROUPS.flatMap(g => g.items);
 
@@ -131,11 +126,13 @@ function AppShellFrame() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-11 items-center gap-3 border-b border-border/50 px-4 bg-[var(--ao-surface)]/60 backdrop-blur-md">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden h-7 w-7">
-                <Menu className="h-4 w-4" />
-                <span className="sr-only">Toggle navigation</span>
-              </Button>
+            <SheetTrigger
+              render={
+                <Button variant="ghost" size="icon" className="md:hidden h-7 w-7" />
+              }
+            >
+              <Menu className="h-4 w-4" />
+              <span className="sr-only">Toggle navigation</span>
             </SheetTrigger>
             <SheetContent side="left" className="w-60 p-0 bg-[var(--ao-surface)] border-border/50">
               <SidebarContent />
@@ -195,29 +192,26 @@ function AppShellFrame() {
 }
 
 function useSidebarData() {
-  const [result] = useQuery({ query: DashboardDocument });
+  const [result] = useQuery<DashboardQuery>({ query: DashboardDocument });
   const data = result.data;
 
-  const taskStats = data?.taskStats;
+  const subjects = data?.subject ?? [];
   const health = data?.daemonHealth;
-  const agents = data?.agentRuns ?? [];
-  const queueDepth = data?.queueStats?.depth ?? 0;
+  const agents = data?.daemonAgents ?? [];
+  const queueLive = data?.queueStats?.total ?? 0;
 
-  const byStatus: Record<string, number> = taskStats?.byStatus ? JSON.parse(taskStats.byStatus) : {};
-  const inProgress = byStatus["in-progress"] ?? 0;
-  const blocked = byStatus["blocked"] ?? 0;
+  const inProgress = subjects.filter((s) => s.status === "IN_PROGRESS").length;
 
   return {
     daemonHealthy: health?.healthy ?? false,
     daemonStatus: health?.status ?? "unknown",
     agentCount: agents.length,
     badges: {
-      tasks: taskStats?.total ?? 0,
+      tasks: subjects.length,
       workflows: inProgress,
-      queue: queueDepth > 0 ? queueDepth : null,
-      agents: agents.length > 0 ? `${agents.length}/${health?.activeDaemons ?? "?"}` : null,
+      queue: queueLive > 0 ? queueLive : null,
+      agents: agents.length > 0 ? agents.length : null,
       events: null,
-      errors: blocked > 0 ? blocked : null,
     } as Record<string, number | string | null>,
   };
 }
@@ -306,18 +300,6 @@ function SidebarContent() {
       <div className="h-px bg-border/50 mx-3" />
 
       <div className="px-3 py-2.5 space-y-2">
-        <NavLink
-          to="/reviews/handoff"
-          className={({ isActive }) =>
-            `flex items-center gap-2 text-[11px] transition-colors ${
-              isActive ? "text-primary" : "text-muted-foreground/60 hover:text-foreground/70"
-            }`
-          }
-        >
-          <ClipboardCheck className="h-3 w-3" />
-          Review Handoff
-        </NavLink>
-
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             {(["system", "dark", "light"] as const).map((t) => (
@@ -383,8 +365,6 @@ function CommandPalette({
         goTo(`/tasks/${q}`);
       } else if (q.startsWith("WF-") || q.startsWith("WORKFLOW-")) {
         goTo(`/workflows/${q}`);
-      } else if (q.startsWith("REQ-")) {
-        goTo(`/planning/requirements/${q}`);
       } else {
         goTo(`/tasks?search=${encodeURIComponent(query.trim())}`);
       }

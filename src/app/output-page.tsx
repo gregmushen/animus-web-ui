@@ -1,168 +1,81 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@/lib/graphql/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { statusColor, PageLoading, PageError } from "./shared";
+import { WorkflowDetailView } from "./workflow-pages";
 
-const TASK_QUERY = `query Task($id: ID!) { task(id: $id) { id title statusRaw } }`;
-const WORKFLOWS_QUERY = `query Workflows { workflows { id taskId statusRaw phases { phaseId status startedAt completedAt } } }`;
-const PHASE_OUTPUT_QUERY = `query PhaseOutput($workflowId: ID!, $phaseId: String, $tail: Int) { phaseOutput(workflowId: $workflowId, phaseId: $phaseId, tail: $tail) { lines phaseId hasMore } }`;
+// The kernel no longer exposes a per-phase output stream, so we surface the
+// workflow `detail` JSON blob. It is now parsed into a structured phase /
+// decision / checkpoint view (shared `WorkflowDetailView`) with a raw-text
+// fallback that still supports search + copy.
+const SUBJECT_QUERY = `query SubjectTitle($id: ID!) { subjectById(id: $id) { id title status } }`;
+const WORKFLOWS_QUERY = `query OutputWorkflows { workflows { id definition status subjectId } }`;
+const WORKFLOW_DETAIL_QUERY = `query OutputWorkflowDetail($id: ID!) { workflow(id: $id) { id definition status subjectId startedAt finishedAt detail } }`;
 
-type TaskData = { task: { id: string; title: string; statusRaw: string | null } };
-type WorkflowPhase = { phaseId: string; status: string | null; startedAt: string | null; completedAt: string | null };
-type Workflow = { id: string; taskId: string | null; statusRaw: string | null; phases: WorkflowPhase[] };
-type WorkflowsData = { workflows: Workflow[] };
-type PhaseOutputData = { phaseOutput: { lines: string[]; phaseId: string; hasMore: boolean } };
-
-function PhaseSection({
-  phase,
-  workflowId,
-  searchTerm,
-  expanded,
-  onToggle,
-}: {
-  phase: WorkflowPhase;
-  workflowId: string;
-  searchTerm: string;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const [result] = useQuery<PhaseOutputData>({
-    query: PHASE_OUTPUT_QUERY,
-    variables: { workflowId, phaseId: phase.phaseId, tail: 500 },
-    pause: !expanded,
-  });
-
-  const lines = result.data?.phaseOutput?.lines ?? [];
-  const filteredLines = useMemo(() => {
-    if (!searchTerm) return lines;
-    const lower = searchTerm.toLowerCase();
-    return lines.filter((l) => l.toLowerCase().includes(lower));
-  }, [lines, searchTerm]);
-
-  return (
-    <Card className="border-border/40 bg-card/60">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <button type="button" onClick={onToggle} className="flex items-center justify-between w-full text-left">
-          <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground/60 font-medium">
-            {phase.phaseId}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant={statusColor(phase.status ?? "")}>{phase.status ?? "unknown"}</Badge>
-            <span className="text-xs text-muted-foreground/50">{expanded ? "\u25B2" : "\u25BC"}</span>
-          </div>
-        </button>
-      </CardHeader>
-      {expanded && (
-        <CardContent className="px-4 pb-3">
-          {result.fetching && <p className="text-xs text-muted-foreground/50">Loading output...</p>}
-          {result.error && <p className="text-xs text-destructive">{result.error.message}</p>}
-          {!result.fetching && !result.error && filteredLines.length === 0 && (
-            <p className="text-xs text-muted-foreground/50">
-              {searchTerm ? "No matching lines." : "No output available."}
-            </p>
-          )}
-          {filteredLines.length > 0 && (
-            <pre data-output-pre className="font-mono text-[11px] text-foreground/70 bg-background/50 rounded-md p-3 overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap break-words">
-              {searchTerm
-                ? filteredLines.map((line, i) => (
-                    <HighlightedLine key={i} line={line} term={searchTerm} />
-                  ))
-                : filteredLines.join("\n")}
-            </pre>
-          )}
-          {result.data?.phaseOutput?.hasMore && (
-            <p className="text-[10px] text-muted-foreground/50 mt-1">Output truncated. Showing last 500 lines.</p>
-          )}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-function HighlightedLine({ line, term }: { line: string; term: string }) {
-  const lower = line.toLowerCase();
-  const termLower = term.toLowerCase();
-  const parts: { text: string; highlight: boolean }[] = [];
-  let idx = 0;
-  while (idx < line.length) {
-    const found = lower.indexOf(termLower, idx);
-    if (found === -1) {
-      parts.push({ text: line.slice(idx), highlight: false });
-      break;
-    }
-    if (found > idx) {
-      parts.push({ text: line.slice(idx, found), highlight: false });
-    }
-    parts.push({ text: line.slice(found, found + term.length), highlight: true });
-    idx = found + term.length;
-  }
-  return (
-    <span>
-      {parts.map((p, i) =>
-        p.highlight ? (
-          <mark key={i} className="bg-yellow-400/30 text-foreground rounded-sm px-0.5">{p.text}</mark>
-        ) : (
-          <span key={i}>{p.text}</span>
-        ),
-      )}
-      {"\n"}
-    </span>
-  );
-}
+type SubjectData = { subjectById: { id: string; title: string; status: string } | null };
+type WorkflowRow = { id: string; definition: string; status: string; subjectId: string | null };
+type WorkflowsData = { workflows: WorkflowRow[] };
+type WorkflowDetailData = { workflow: { id: string; definition: string; status: string; subjectId: string | null; startedAt: string; finishedAt: string | null; detail: string | null } };
 
 export function TaskOutputPage() {
   const { taskId } = useParams();
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
-  const [allExpanded, setAllExpanded] = useState(false);
+  const [view, setView] = useState<"structured" | "raw">("structured");
 
-  const [taskResult] = useQuery<TaskData>({ query: TASK_QUERY, variables: { id: taskId! } });
+  const [subjectResult] = useQuery<SubjectData>({ query: SUBJECT_QUERY, variables: { id: taskId! } });
   const [workflowsResult] = useQuery<WorkflowsData>({ query: WORKFLOWS_QUERY });
 
-  const task = taskResult.data?.task;
+  const subject = subjectResult.data?.subjectById;
   const workflows = workflowsResult.data?.workflows ?? [];
-  const workflow = workflows.find((w) => w.taskId === taskId);
-  const phases = workflow?.phases ?? [];
+  const workflow = workflows.find((w) => w.subjectId === taskId);
 
-  const togglePhase = (phaseId: string) => {
-    setExpandedPhases((prev) => {
-      const next = new Set(prev);
-      if (next.has(phaseId)) next.delete(phaseId);
-      else next.add(phaseId);
-      return next;
-    });
-  };
+  const [detailResult] = useQuery<WorkflowDetailData>({
+    query: WORKFLOW_DETAIL_QUERY,
+    variables: { id: workflow?.id ?? "" },
+    pause: !workflow,
+  });
 
-  const toggleAll = () => {
-    if (allExpanded) {
-      setExpandedPhases(new Set());
-      setAllExpanded(false);
-    } else {
-      setExpandedPhases(new Set(phases.map((p) => p.phaseId)));
-      setAllExpanded(true);
+  const rawDetail = detailResult.data?.workflow?.detail ?? null;
+
+  const parsedDetail = useMemo<unknown>(() => {
+    if (!rawDetail) return null;
+    try {
+      return JSON.parse(rawDetail);
+    } catch {
+      return null;
     }
-  };
+  }, [rawDetail]);
+
+  const detailText = useMemo(() => {
+    if (!rawDetail) return "";
+    return parsedDetail != null ? JSON.stringify(parsedDetail, null, 2) : rawDetail;
+  }, [rawDetail, parsedDetail]);
+
+  const filteredText = useMemo(() => {
+    if (!searchTerm) return detailText;
+    const lower = searchTerm.toLowerCase();
+    return detailText
+      .split("\n")
+      .filter((l) => l.toLowerCase().includes(lower))
+      .join("\n");
+  }, [detailText, searchTerm]);
 
   const copyAll = async () => {
-    const allOutputs = document.querySelectorAll("[data-output-pre]");
-    const text = Array.from(allOutputs)
-      .map((el) => el.textContent ?? "")
-      .join("\n\n");
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(detailText);
     } catch {
       /* clipboard not available */
     }
   };
 
-  if (taskResult.fetching || workflowsResult.fetching) return <PageLoading />;
-  if (taskResult.error) return <PageError message={taskResult.error.message} />;
+  if (subjectResult.fetching || workflowsResult.fetching) return <PageLoading />;
+  if (subjectResult.error) return <PageError message={subjectResult.error.message} />;
   if (workflowsResult.error) return <PageError message={workflowsResult.error.message} />;
-  if (!task) return <PageError message={`Task ${taskId} not found.`} />;
+  if (!subject) return <PageError message={`Subject ${taskId} not found.`} />;
 
   return (
     <div className="space-y-4">
@@ -171,53 +84,77 @@ export function TaskOutputPage() {
           <Link to={`/tasks/${taskId}`} className="text-xs text-muted-foreground/60 hover:text-foreground transition-colors">
             &larr; Back to task
           </Link>
-          <h1 className="text-2xl font-semibold tracking-tight">Output for {task.id}</h1>
-          <p className="text-sm text-muted-foreground/70 mt-0.5">{task.title}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Output for {subject.id}</h1>
+          <p className="text-sm text-muted-foreground/70 mt-0.5">{subject.title}</p>
         </div>
         <div className="flex items-center gap-2">
-          {workflow && <Badge variant={statusColor(workflow.statusRaw ?? "")}>{workflow.statusRaw}</Badge>}
+          {workflow && <Badge variant={statusColor(workflow.status.toLowerCase())}>{workflow.status}</Badge>}
         </div>
       </div>
 
       {!workflow ? (
         <Card className="border-border/40 bg-card/60">
           <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-sm text-muted-foreground/60">No workflow found for this task.</p>
+            <p className="text-sm text-muted-foreground/60">No workflow found for this subject.</p>
           </CardContent>
         </Card>
       ) : (
         <>
-          <div className="flex items-center gap-3">
-            <Input
-              placeholder="Search output..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button size="sm" variant="outline" onClick={toggleAll}>
-              {allExpanded ? "Collapse All" : "Expand All"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={copyAll}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={view === "structured" ? "secondary" : "ghost"}
+                className="h-7 text-xs"
+                onClick={() => setView("structured")}
+              >
+                Phases
+              </Button>
+              <Button
+                size="sm"
+                variant={view === "raw" ? "secondary" : "ghost"}
+                className="h-7 text-xs"
+                onClick={() => setView("raw")}
+              >
+                Raw
+              </Button>
+            </div>
+            {view === "raw" && (
+              <Input
+                placeholder="Search output..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            )}
+            <Button size="sm" variant="outline" onClick={copyAll} className="ml-auto">
               Copy All
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {phases.map((phase) => (
-              <PhaseSection
-                key={phase.phaseId}
-                phase={phase}
-                workflowId={workflow.id}
-                searchTerm={searchTerm}
-                expanded={expandedPhases.has(phase.phaseId)}
-                onToggle={() => togglePhase(phase.phaseId)}
-              />
-            ))}
-          </div>
-
-          {phases.length === 0 && (
-            <p className="text-sm text-muted-foreground/50 text-center py-8">No phases in this workflow.</p>
-          )}
+          <Card className="border-border/40 bg-card/60">
+            <CardContent className="px-4 pb-3 pt-3">
+              {detailResult.fetching && <p className="text-xs text-muted-foreground/50">Loading output...</p>}
+              {detailResult.error && <p className="text-xs text-destructive">{detailResult.error.message}</p>}
+              {!detailResult.fetching && !detailResult.error && !rawDetail && (
+                <p className="text-xs text-muted-foreground/50">No run detail available yet.</p>
+              )}
+              {!detailResult.fetching && !detailResult.error && rawDetail && view === "structured" && (
+                <WorkflowDetailView detail={parsedDetail ?? rawDetail} />
+              )}
+              {!detailResult.fetching && !detailResult.error && rawDetail && view === "raw" && (
+                filteredText.length === 0 ? (
+                  <p className="text-xs text-muted-foreground/50">
+                    {searchTerm ? "No matching lines." : "No run detail available yet."}
+                  </p>
+                ) : (
+                  <pre data-output-pre className="font-mono text-[11px] text-foreground/70 bg-background/50 rounded-md p-3 overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap break-words">
+                    {filteredText}
+                  </pre>
+                )
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

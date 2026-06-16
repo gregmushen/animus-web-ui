@@ -104,6 +104,11 @@ export function useMutation<TData = any, TVars = any>(
 ): [{ fetching: boolean }, (vars: TVars) => Promise<{ data?: TData; error?: { message: string } }>] {
   const mutation = _useMutation<TData, Error, TVars>({
     mutationFn: (variables: TVars) => gqlRequest<TData>(doc, variables),
+    // Mirror CLI behavior: after any successful mutation, mark every cached
+    // query stale so open lists/detail views refetch and reflect the change.
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
   });
 
   const execute = async (variables: TVars) => {

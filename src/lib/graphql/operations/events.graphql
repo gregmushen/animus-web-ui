@@ -1,3 +1,41 @@
-subscription DaemonEvents($eventType: String) {
-  daemonEvents(eventType: $eventType) { id seq timestamp eventType data }
+query DaemonActivity {
+  daemonAgents {
+    sessionId
+    provider
+    model
+    workflowId
+    phaseId
+    startedAt
+  }
+  daemonHealth {
+    healthy
+    status
+    lastError
+  }
+}
+
+subscription DaemonEvents {
+  daemonEvents {
+    id
+    kind
+    payload
+    at
+  }
+}
+
+subscription WorkflowEvents($workflowId: ID, $kinds: [String!]) {
+  workflowEvents(workflowId: $workflowId, kinds: $kinds) {
+    workflowId
+    kind
+    payload
+    at
+  }
+}
+
+subscription SubjectChanged($kind: String) {
+  subjectChanged(kind: $kind) {
+    subjectId
+    change
+    at
+  }
 }
