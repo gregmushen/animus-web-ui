@@ -14,6 +14,13 @@ pub struct WebUiSettings {
 
 impl WebUiSettings {
     pub const DEFAULT_BIND_ADDR: &'static str = "127.0.0.1:8082";
+    pub const DEFAULT_GRAPHQL_ORIGIN: &'static str = "http://127.0.0.1:8081";
+
+    pub fn graphql_origin(&self) -> &str {
+        self.api_origin
+            .as_deref()
+            .unwrap_or(Self::DEFAULT_GRAPHQL_ORIGIN)
+    }
 
     pub fn from_config(config: &TransportConfig) -> Self {
         let api_origin = config

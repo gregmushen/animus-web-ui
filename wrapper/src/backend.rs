@@ -84,7 +84,7 @@ impl TransportBackend for WebUiBackend {
         TransportSchema {
             kinds: vec!["http".into(), "static".into()],
             supports_streaming: false,
-            supports_websocket: false,
+            supports_websocket: true,
             default_port: Some(DEFAULT_PORT),
         }
     }
