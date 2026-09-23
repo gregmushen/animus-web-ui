@@ -67,7 +67,11 @@ Optional `config` keys in the `TransportConfig` payload:
 
 | Key          | Type   | Notes                                              |
 |--------------|--------|----------------------------------------------------|
-| `api_origin` | string | Forwarded to the UI for runtime API endpoint discovery (currently unused — the UI resolves `window.location.origin` by default). |
+| `api_origin` | string | GraphQL transport origin proxied by the UI server. Defaults to `http://127.0.0.1:8081`. |
+
+The UI server proxies `/graphql`, `/graphql/sdl`, and `/graphql/ws` to the
+GraphQL transport. This keeps browser requests same-origin and avoids `405`
+responses from the static asset handler.
 
 Example `.animus/config.json` snippet:
 
