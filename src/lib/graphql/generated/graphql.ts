@@ -585,7 +585,7 @@ export type StartDaemonMutation = { __typename?: 'MutationRoot', startDaemon: bo
 export type DashboardQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DashboardQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, status: SubjectStatus }>, daemon: { __typename?: 'DaemonStatus', running: boolean, version?: string | null }, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, checks: Array<{ __typename?: 'HealthCheck', name: string, healthy: boolean, message: string }> }, queueStats: { __typename?: 'QueueStats', total: number, ready: number, held: number, dispatched: number } };
+export type DashboardQuery = { __typename?: 'QueryRoot', subject: Array<{ __typename?: 'Subject', id: string, status: SubjectStatus, priority?: number | null }>, daemon: { __typename?: 'DaemonStatus', running: boolean, version?: string | null, projectRoot?: string | null }, daemonHealth: { __typename?: 'DaemonHealth', healthy: boolean, status: HealthStatus, plugins: Array<{ __typename?: 'PluginHealth', name: string, kind: string, status: HealthStatus }> }, daemonAgents: Array<{ __typename?: 'DaemonAgent', sessionId: string, provider: string, model: string, workflowId?: string | null, phaseId?: string | null }>, queueStats: { __typename?: 'QueueStats', total: number, ready: number, held: number, inFlight: number } };
 
 export type ReadySubjectsQueryVariables = Exact<{
   kind?: InputMaybe<Scalars['String']['input']>;
@@ -826,24 +826,34 @@ export const DashboardDocument = new TypedDocumentString(`
   subject(kind: "task") {
     id
     status
+    priority
   }
   daemon {
     running
     version
+    projectRoot
   }
   daemonHealth {
     healthy
-    checks {
+    status
+    plugins {
       name
-      healthy
-      message
+      kind
+      status
     }
+  }
+  daemonAgents {
+    sessionId
+    provider
+    model
+    workflowId
+    phaseId
   }
   queueStats {
     total
     ready
     held
-    dispatched
+    inFlight
   }
 }
     `) as unknown as TypedDocumentString<DashboardQuery, DashboardQueryVariables>;
