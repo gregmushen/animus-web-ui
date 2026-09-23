@@ -7,7 +7,7 @@ import { gzipSync } from "node:zlib";
 const JS_GZIP_BUDGET_BYTES = 110 * 1024;
 const CSS_GZIP_BUDGET_BYTES = 36 * 1024;
 
-const embeddedDirPath = resolve(import.meta.dirname, "..", "..", "embedded");
+const embeddedDirPath = resolve(import.meta.dirname, "..", "dist");
 const embeddedIndexPath = resolve(embeddedDirPath, "index.html");
 const failures = [];
 
@@ -29,11 +29,11 @@ const jsEntryAsset = pickEntryAsset(scriptAssetPaths, ".js");
 const cssEntryAsset = pickEntryAsset(stylesheetAssetPaths, ".css");
 
 if (!jsEntryAsset) {
-  failures.push("Missing referenced JS entry asset in embedded/index.html");
+  failures.push("Missing referenced JS entry asset in dist/index.html");
 }
 
 if (!cssEntryAsset) {
-  failures.push("Missing referenced CSS entry asset in embedded/index.html");
+  failures.push("Missing referenced CSS entry asset in dist/index.html");
 }
 
 if (jsEntryAsset) {
@@ -71,17 +71,17 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("[budget:ok] Embedded entry assets meet gzip budgets");
+console.log("[budget:ok] Production entry assets meet gzip budgets");
 
 function readEmbeddedIndexSource(indexPath, failures) {
   try {
     return readFileSync(indexPath, "utf8");
   } catch (error) {
     failures.push(
-      `Unable to read embedded/index.html at ${indexPath}. Run \`npm run build\` before budget checks.`,
+      `Unable to read dist/index.html at ${indexPath}. Run \`npm run build\` before budget checks.`,
     );
     if (error instanceof Error && error.message) {
-      failures.push(`embedded/index.html read error: ${error.message}`);
+      failures.push(`dist/index.html read error: ${error.message}`);
     }
     return null;
   }
@@ -118,7 +118,7 @@ function buildAssetResult(assetPath, budgetBytes) {
   if (!isInsideDirectory(embeddedDirPath, absoluteAssetPath)) {
     return {
       kind: "error",
-      message: `Referenced asset resolves outside embedded directory: ${assetPath}`,
+      message: `Referenced asset resolves outside dist directory: ${assetPath}`,
     };
   }
 

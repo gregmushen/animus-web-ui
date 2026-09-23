@@ -101,7 +101,7 @@ async fn backend_lifecycle_round_trip() {
     let schema = backend.schema();
     assert_eq!(schema.default_port, Some(DEFAULT_PORT));
     assert!(schema.kinds.iter().any(|k| k == "http"));
-    assert!(!schema.supports_websocket);
+    assert!(schema.supports_websocket);
 
     let health_before = backend.health().await.expect("health");
     assert!(matches!(health_before.status, HealthStatus::Degraded));
