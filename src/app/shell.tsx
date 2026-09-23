@@ -197,20 +197,19 @@ function useSidebarData() {
 
   const subjects = data?.subject ?? [];
   const health = data?.daemonHealth;
-  const agents = data?.daemonAgents ?? [];
   const queueLive = data?.queueStats?.total ?? 0;
 
   const inProgress = subjects.filter((s) => s.status === "IN_PROGRESS").length;
 
   return {
     daemonHealthy: health?.healthy ?? false,
-    daemonStatus: health?.status ?? "unknown",
-    agentCount: agents.length,
+    daemonStatus: health ? (health.healthy ? "healthy" : "unhealthy") : "unknown",
+    agentCount: 0,
     badges: {
       tasks: subjects.length,
       workflows: inProgress,
       queue: queueLive > 0 ? queueLive : null,
-      agents: agents.length > 0 ? agents.length : null,
+      agents: null,
       events: null,
     } as Record<string, number | string | null>,
   };
@@ -423,4 +422,3 @@ function CommandPalette({
     </Dialog>
   );
 }
-
